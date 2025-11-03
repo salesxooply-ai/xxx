@@ -1,0 +1,2184 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Sales (Hibrida)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        /* Menggunakan Inter sebagai font utama, dengan fallback ke font sistem sans-serif */
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Style untuk tombol filter periode yang aktif */
+        .filter-btn.active { background-color: #3b82f6; color: white; }
+        
+        /* Style untuk tooltip (saat ini tidak digunakan, tapi ada di kode asli) */
+        .tooltip { position: relative; display: inline-block; cursor: pointer; }
+        .tooltip .tooltiptext { visibility: hidden; width: 220px; background-color: #1f2937; color: #fff; text-align: left; border-radius: 6px; padding: 5px 8px; position: absolute; z-index: 10; bottom: 125%; left: 50%; margin-left: -110px; opacity: 0; transition: opacity 0.3s; }
+        .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+
+        /* Custom style untuk status deal (Sekarang hanya label statis) */
+        .status-label {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        /* Warna spesifik untuk setiap status */
+        .status-Awareness { background-color: #2563eb22; color: #3b82f6; border: 1px solid #3b82f6; } 
+        .status-Interest { background-color: #05966922; color: #10b981; border: 1px solid #10b981; } 
+        .status-Desire { background-color: #f59e0b22; color: #f59e0b; border: 1px solid #f59e0b; } 
+        .status-ProcessClosing { background-color: #f59e0b22; color: #f59e0b; border: 1px solid #f59e0b; } 
+        .status-Action { background-color: #ef444422; color: #ef4444; border: 1px solid #ef4444; } 
+        .status-Delivery { background-color: #3b82f622; color: #3b82f6; border: 1px solid #3b82f6; } 
+        .status-Payment { background-color: #10b98122; color: #10b981; border: 1px solid #10b981; } 
+        .status-Lost { background-color: #7f1d1d22; color: #f87171; border: 1px solid #f87171; } 
+
+        /* Style untuk AIDA progress bar */
+        .progress-bar-container {
+            display: flex;
+            height: 12px;
+            border-radius: 6px;
+            overflow: hidden;
+            background-color: #374151; /* Darker background for empty space */
+        }
+
+        .progress-segment {
+            height: 100%;
+            transition: width 0.5s ease-out;
+            border-right: 1px solid #1f2937; /* Pemisah tipis antar segmen */
+        }
+        .progress-segment:last-child {
+            border-right: none;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 640px) {
+            .grid-cols-2-mobile {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* --- PERBAIKAN TATA LETAK KALENDER (TINGGI BARU) --- */
+        .calendar-grid { 
+            display: grid; 
+            grid-template-columns: repeat(7, 1fr); 
+            gap: 1px; 
+            background-color: #374151; 
+            border: 1px solid #374151; 
+        }
+        .calendar-day-header { 
+            font-size: 0.75rem; 
+            text-align: center; 
+            padding: 8px 0; 
+            font-weight: 500; 
+            color: #9ca3af; 
+            background-color: #374151; 
+        }
+        .calendar-cell { 
+            background-color: #1f293b; 
+            padding: 4px; 
+            min-height: 95px; /* Disesuaikan agar sejajar dengan 3 grafik di kanan */
+            position: relative; 
+            display: flex; 
+            flex-direction: column;
+            overflow: hidden; /* **PENTING**: Mencegah event keluar dari batas sel */
+        }
+        .calendar-date { 
+            font-size: 0.8rem; 
+            font-weight: 500; 
+            margin-bottom: 4px; 
+            color: #d1d5db; 
+        }
+        .calendar-event { 
+            background-color: #3b82f6; 
+            border-left: 3px solid #60a5fa; 
+            color: white; 
+            padding: 1px 4px; /* Padding dikurangi */
+            margin-bottom: 2px; 
+            border-radius: 2px; 
+            font-size: 0.6rem; /* Font size dikurangi */
+            cursor: pointer; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            white-space: nowrap; 
+        }
+        .today .calendar-date { 
+            background-color: #3b82f6; 
+            color: white; 
+            border-radius: 50%; 
+            width: 20px; 
+            height: 20px; 
+            display: inline-flex; 
+            align-items: center; 
+            justify-content: center; 
+            padding: 2px;
+        }
+        
+        /* Style untuk tabel baru */
+        #supportTableContainer table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #supportTableContainer th, #supportTableContainer td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #374151; /* Garis pemisah abu-abu tua */
+        }
+        #supportTableContainer th {
+            background-color: #1f293b; /* Header abu-abu gelap */
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #9ca3af; /* Teks abu-abu terang */
+            font-weight: 600;
+        }
+        #supportTableContainer tr:hover {
+            background-color: #2a3447; /* Hover row yang lebih gelap */
+        }
+        #supportTableContainer td {
+            font-size: 0.875rem;
+            color: #d1d5db; /* Teks putih keabu-abuan */
+        }
+         /* Style untuk tombol "+ Lainnya" di kalender */
+        .calendar-others {
+            font-size: 0.7rem;
+            color: #a5f3fc; /* text-cyan-200 */
+            text-align: center;
+            padding: 1px 4px; /* Padding dikurangi */
+            margin-top: 2px;
+            border-radius: 2px;
+            background-color: #334155; /* bg-slate-700 */
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .calendar-others:hover {
+            background-color: #475569; /* bg-slate-600 */
+        }
+
+        /* --- FADE-IN BARU UNTUK DASHBOARD (DURASI LEBIH LAMA) --- */
+        .fade-in-dashboard {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.8s ease-out, transform 0.8s ease-out; /* Ditingkatkan ke 0.8s */
+        }
+        .fade-in-dashboard.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        /* --- AKHIR FADE-IN BARU --- */
+
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-4 sm:p-8">
+
+    <!-- LAYAR LOGIN -->
+    <div id="loginScreen" class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-gray-800 p-8 rounded-2xl shadow-xl w-full max-w-sm fade-in border border-gray-700">
+            <div class="text-center mb-6">
+                <img src="https://info.xooply.id/wp-content/uploads/2023/01/Xooply-New-Fix.png" alt="Company Logo" class="h-16 w-auto mx-auto mb-4 bg-white p-2 rounded-lg">
+                <h1 class="text-2xl font-bold text-white mt-4">Dashboard Monitoring Sales Activity</h1>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label for="roleSelector" class="block text-sm font-medium text-gray-400 mb-1">Pilih Peran</label>
+                    <select id="roleSelector" class="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="sales">Sales Person</option>
+                        <option value="manager">Manager</option>
+                        <option value="head_sales">Head Sales</option>
+                    </select>
+                </div>
+                <div id="managerSelectorContainer" class="hidden">
+                    <label for="managerSelector" class="block text-sm font-medium text-gray-400 mb-1">Pilih Manager</label>
+                    <select id="managerSelector" class="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+                <div id="salesPersonSelectorContainer">
+                    <label for="salesPersonSelector" class="block text-sm font-medium text-gray-400 mb-1">Pilih Nama Anda</label>
+                    <select id="salesPersonSelector" class="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+                <div>
+                    <label for="passwordInput" class="block text-sm font-medium text-gray-400 mb-1">Password</label>
+                    <input type="password" id="passwordInput" class="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Masukkan password Anda">
+                </div>
+                <button id="loginBtn" class="w-full bg-blue-600 text-white font-semibold py-2.5 px-4 rounded-lg hover:bg-blue-700 transition-colors">Masuk</button>
+                <p id="loginError" class="text-red-500 text-sm text-center pt-2 hidden">Password atau username salah.</p>
+            </div>
+        </div>
+    </div>
+    <!-- AKHIR LAYAR LOGIN -->
+
+    <!-- Loading Indicator (DIPINDAHKAN KE LUAR & DI-STYLE ULANG) -->
+    <div id="loadingIndicator" class="flex flex-col items-center justify-center min-h-screen p-4 text-center hidden">
+        <svg class="animate-spin h-8 w-8 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p class="text-gray-400 mt-3">Sedang mengambil data...</p>
+    </div>
+
+    <!-- KONTEN UTAMA (DASHBOARD) -->
+    <div id="mainContent" class="hidden container mx-auto p-4 md:p-8 fade-in-dashboard">
+
+        <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+            <div>
+                 <h1 class="text-3xl font-bold text-white mb-2">Dashboard Sales Activity</h1>
+                 <!-- Perubahan 1: Gunakan ID untuk Subtitle yang diupdate setelah login -->
+                 <p id="dashboardSubtitle" class="text-gray-400">Analisis Gabungan Kinerja dan Aktivitas Harian.</p> 
+            </div>
+            <div class="flex items-center gap-4 mt-4 sm:mt-0">
+                <button id="logoutBtn" class="flex items-center bg-gray-700 text-gray-300 font-semibold py-2 px-4 rounded-lg shadow-sm border border-gray-600 hover:bg-gray-600 transition-colors">
+                    <i data-lucide="log-out" class="mr-2 h-5 w-5"></i>
+                    Logout
+                </button>
+            </div>
+        </header>
+
+        <!-- Filter Global (Diambil dari Dasboard 28 oct) -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-sm mb-8 border border-gray-700">
+            <h2 class="text-xl font-semibold mb-4 text-white">Filter Global</h2>
+            <div class="flex flex-col sm:flex-row gap-4 items-center">
+                
+                <!-- Filter Sales Person / Manager (Diambil dari Dasboard 28 oct) -->
+                 <div id="managerFilterContainer" class="w-full sm:w-auto hidden">
+                    <label for="salesFilter" class="block text-sm font-medium text-gray-400 mb-1 sr-only">Filter Sales</label>
+                    <select id="salesFilter" class="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                 </div>
+                
+                <div id="globalPeriodFilters" class="flex items-center bg-gray-700 rounded-lg p-1 text-sm shrink-0">
+                    <button class="filter-btn px-3 py-1 rounded-md transition-colors text-gray-300 hover:bg-gray-600" data-period="this-week">Minggu Ini</button>
+                    <button class="filter-btn px-3 py-1 rounded-md transition-colors text-gray-300 hover:bg-gray-600 active" data-period="this-month">Bulan Ini</button>
+                    <button class="filter-btn px-3 py-1 rounded-md transition-colors text-gray-300 hover:bg-gray-600" data-period="custom">Custom</button>
+                </div>
+                
+                <div id="customDateContainer" class="hidden sm:flex items-center gap-2 text-sm">
+                    <input type="date" id="startDate" class="px-2 py-1 border border-gray-600 bg-gray-700 text-white rounded-md" style="color-scheme: dark;">
+                    <span class="text-gray-400">-</span>
+                    <input type="date" id="endDate" class="px-2 py-1 border border-gray-600 bg-gray-700 text-white rounded-md" style="color-scheme: dark;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Indicator (Disimpan) -->
+        <!-- 
+        <div id="loadingIndicator" class="text-center py-12 hidden">
+             ... KODE INI DIPINDAHKAN KE LUAR mainContent ...
+        </div>
+         -->
+        
+        <!-- Form Input (Tampilan Sales Person) -->
+        <div id="inputFormContainer" class="bg-gray-800 p-6 rounded-xl shadow-lg mb-8 border border-gray-700 hidden">
+             <h2 class="text-xl font-semibold mb-4 text-white">Tambah Aktivitas Baru</h2>
+             <div id="successMessage" class="hidden bg-emerald-900 text-emerald-300 p-3 rounded-lg mb-4 text-sm border border-emerald-700"></div>
+             <div id="errorMessage" class="hidden bg-red-900 text-red-300 p-3 rounded-lg mb-4 text-sm border border-red-700"></div>
+            <form id="activityForm">
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div><label for="clientName" class="block text-sm font-medium text-gray-400">Nama Klien</label><input type="text" id="clientName" class="w-full mt-1 px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg" required></div>
+                    <div><label for="meetingDate" class="block text-sm font-medium text-gray-400">Tgl Meeting</label><input type="date" id="meetingDate" class="w-full mt-1 px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg" style="color-scheme: dark;" required></div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="lokasiProvinsi" class="block text-sm font-medium text-gray-400">Provinsi</label>
+                        <select id="lokasiProvinsi" class="w-full mt-1 px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg" required>
+                            <option value="">-- Pilih Provinsi --</option>
+                            <!-- Opsi di-generate oleh JS -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="lokasiKota" class="block text-sm font-medium text-gray-400">Kota/Kabupaten</label>
+                        <select id="lokasiKota" class="w-full mt-1 px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg" required>
+                            <option value="">-- Pilih Provinsi Dulu --</option>
+                            <!-- Opsi di-generate oleh JS -->
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- NEW: SEGMENT KLIEN -->
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="clientSegment" class="block text-sm font-medium text-gray-400">Segmen Klien</label>
+                        <select id="clientSegment" class="w-full mt-1 px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg" required>
+                            <option value="Enterprise">Enterprise</option>
+                            <option value="Government">Government</option>
+                            <option value="Education">Education</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="salesPerson" class="block text-sm font-medium text-gray-400">Nama Sales</label>
+                        <select id="salesPerson" class="w-full mt-1 px-3 py-2 border border-gray-600 bg-gray-600 text-white rounded-lg" required disabled></select>
+                    </div>
+                 </div>
+                 <!-- END: SEGMENT KLIEN -->
+
+
+                <div class="mb-4">
+                     <label class="block text-sm font-medium mb-2 text-gray-400">Tipe Klien</label>
+                     <div class="flex gap-4"><label class="flex items-center"><input type="radio" name="clientType" value="new" class="h-4 w-4 text-blue-500" checked><span class="ml-2">Klien Baru</span></label><label class="flex items-center"><input type="radio" name="clientType" value="existing" class="h-4 w-4 text-blue-500"><span class="ml-2">Klien Existing</span></label></div>
+                </div>
+                 
+                 <!-- Input RFQ dan Project -->
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div><label for="nomorRFQ" class="block text-sm font-medium text-gray-400">Lead ID</label><input type="text" id="nomorRFQ" class="w-full mt-1 px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg" required></div>
+                    <div><label for="namaProject" class="block text-sm font-medium text-gray-400">Nama Project</label><input type="text" id="namaProject" class="w-full mt-1 px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg" required></div>
+                </div>
+
+                 <div class="mb-4"><label for="meetingNotes" class="block text-sm font-medium text-gray-400">Hasil Meeting</label><textarea id="meetingNotes" rows="3" class="w-full mt-1 px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg"></textarea></div>
+                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label for="meetingType" class="block text-sm font-medium text-gray-400">Type Aktivitas</label>
+                        <select id="meetingType" class="w-full mt-1 px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg" required>
+                            <option>Awareness</option><option>Interest</option><option>Desire</option><option>Process Closing</option><option>Action</option><option>Delivery</option><option>Payment</option><option>Lost</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="capability" class="block text-sm font-medium text-gray-400">Capability</label>
+                        <select id="capability" class="w-full mt-1 px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg" required>
+                            <option>SIPLah</option>
+                            <option>IT Outsourcing</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="dealValue" class="block text-sm font-medium text-gray-400">Estimasi Amount (Rp)</label>
+                        <input type="text" id="dealValue" class="w-full mt-1 px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg" oninput="formatRupiah(this)" required>
+                    </div>
+                </div>
+
+                <!-- Input Support Needed -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="unitInCharge" class="block text-sm font-medium text-gray-400">Unit in Charge (Support)</label>
+                        <select id="unitInCharge" class="w-full mt-1 px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg">
+                            <!-- Opsi di-generate oleh JS -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="supportCategory" class="block text-sm font-medium text-gray-400">Kategori Support</label>
+                        <select id="supportCategory" class="w-full mt-1 px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg">
+                            <!-- Opsi di-generate oleh JS -->
+                        </select>
+                    </div>
+                </div>
+
+                <div id="recurringOption" class="mb-4 hidden"><label class="flex items-center"><input type="checkbox" id="isRecurring" class="h-4 w-4 text-blue-500"><span class="ml-2">Pelanggan recurring</span></label></div>
+                <div id="obstacleSection" class="mb-6 hidden"><label for="salesObstacle" class="block text-sm font-medium text-gray-400">Hambatan</label><select id="salesObstacle" class="w-full mt-1 px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg"><option>Harga Terlalu Tinggi</option><option>Kalah dari Kompetitor</option><option>Fitur Produk Kurang</option><option>Waktu Tidak Tepat</option><option>Lainnya</option></select></div>
+                <button type="submit" id="submitBtn" class="w-full bg-blue-600 text-white font-semibold py-2.5 px-4 rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors">Simpan</button>
+            </form>
+        </div>
+        <!-- AKHIR FORM INPUT -->
+        
+        <!-- Summary Section (Narative) -->
+        <div id="summaryContainer" class="mt-8 hidden">
+            <div id="summaryText" class="bg-gray-800 p-6 rounded-xl shadow-lg mb-8 text-gray-300 border border-gray-700">
+                <!-- Ringkasan Naratif akan diisi di sini -->
+            </div>
+        </div>
+
+        <!-- Metrik Kunci 4 Kartu (MODIFIKASI dari Dasboard Hibrida) -->
+        <div id="metricsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <!-- Total Meeting -->
+            <div class="bg-gray-800 p-5 rounded-xl shadow-lg border border-gray-700">
+                <p class="text-sm font-medium text-gray-400 flex items-center">Total Meeting <i data-lucide="calendar" class="w-4 h-4 ml-1 text-blue-400"></i></p>
+                <!-- Perubahan 2: Ubah ID metric agar sesuai dengan Hibrida -->
+                <p id="metricTotalMeetings" class="text-3xl font-bold text-white mt-1">0</p>
+            </div>
+            <!-- KLIEN BARU (Pengganti Avg. Nilai Deal) -->
+            <div class="bg-gray-800 p-5 rounded-xl shadow-lg border border-gray-700">
+                <p class="text-sm font-medium text-gray-400 flex items-center">Total Klien Baru <i data-lucide="user-plus" class="w-4 h-4 ml-1 text-red-400"></i></p>
+                <p id="metricNewClients" class="text-3xl font-bold text-white mt-1">0</p>
+            </div>
+            <!-- KLIEN EXISTING (Pengganti Win Rate) -->
+            <div class="bg-gray-800 p-5 rounded-xl shadow-lg border border-gray-700">
+                <!-- PERBAIKAN CRASH: Menghapus teks deskriptif yang tidak perlu -->
+                <p class="text-sm font-medium text-gray-400 flex items-center">Total Klien Existing <i data-lucide="users" class="w-4 h-4 ml-1 text-yellow-400"></i></p>
+                <p id="metricExistingClients" class="text-3xl font-bold text-white mt-1">0</p>
+            </div>
+            <!-- Total RFQ Unik -->
+            <div class="bg-gray-800 p-5 rounded-xl shadow-lg border border-gray-700">
+                <p class="text-sm font-medium text-gray-400 flex items-center">Total Lead ID Unik <i data-lucide="folder-open" class="w-4 h-4 ml-1 text-purple-400"></i></p>
+                <p id="metricTotalRFQs" class="text-3xl font-bold text-white mt-1">0</p>
+            </div>
+        </div>
+
+        <!-- Tata Letak Tengah (2 Kolom) -->
+        <div class="flex flex-col lg:flex-row gap-6 mb-8">
+            
+            <!-- KOLOM KIRI (2/3) - Distribusi, Efisiensi, Kalender -->
+            <div class="lg:w-2/3 space-y-6">
+                 <!-- Distribusi Pipeline (AIDA Progress Bar) -->
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+                    <h2 class="text-xl font-semibold text-white mb-4 flex items-center">Distribusi Aktivitas Pipeline (AIDA)</h2>
+                    <div id="aidaProgressBar" class="progress-bar-container">
+                        <!-- Segmen akan diisi oleh JS -->
+                    </div>
+                    <div class="flex justify-between text-sm text-gray-400 mt-2">
+                        <span class="text-blue-400">Awareness</span>
+                        <span class="text-green-400">Interest</span>
+                        <span class="text-yellow-400">Desire</span>
+                        <span class="text-red-400">Action</span> 
+                    </div>
+                    <div id="aidaLegend" class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                        <!-- Legend AIDA akan diisi oleh JS -->
+                    </div>
+                </div>
+                
+                 <!-- NEW: GRAFIK SEGMENT KLIEN (DIPINDAH KE SINI) -->
+                 <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+                    <h2 class="text-xl font-semibold text-white mb-4 flex items-center">Distribusi Segmen Klien</h2>
+                    <div id="clientSegmentProgressBar" class="progress-bar-container">
+                        <!-- Segmen akan diisi oleh JS -->
+                    </div>
+                    <div class="flex justify-between text-sm text-gray-400 mt-2">
+                        <span class="text-purple-400">Enterprise</span>
+                        <span class="text-orange-400">Government</span>
+                        <span class="text-cyan-400">Education</span> 
+                    </div>
+                    <div id="clientSegmentLegend" class="mt-4 grid grid-cols-3 gap-4 text-sm">
+                        <!-- Legend Segmen akan diisi oleh JS -->
+                    </div>
+                </div>
+                
+                <!-- Estimasi Amount (LAMA) & Metrik Efisiensi -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Avg. Durasi Sales Cycle (LAMA) - Tetap ada sebagai CARD -->
+                    <div class="bg-gray-800 p-5 rounded-xl shadow-lg border border-gray-700 flex flex-col justify-center">
+                        <h2 class="text-sm font-semibold text-gray-400 mb-1">Rata-rata Durasi Sales Cycle</h2>
+                        <div class="flex items-end mt-1">
+                            <p id="avgSalesCycleDuration" class="text-3xl font-bold text-purple-400">0</p>
+                            <p class="text-lg text-gray-400 ml-2">hari</p>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">(Awareness ke Action)</p>
+                    </div>
+
+                    <!-- Avg. Pergerakan Tahap (Efisiensi) -->
+                    <div class="bg-gray-800 p-5 rounded-xl shadow-lg border border-gray-700">
+                        <p class="text-sm font-medium text-gray-400">Avg. Pergerakan Tahap</p>
+                        <p id="metricAvgSteps" class="text-3xl font-bold text-white mt-1">0</p>
+                        <p class="text-xs text-gray-500 mt-1">Meeting / Lead ID Won</p>
+                    </div>
+                    <!-- Rasio RFQ Existing (Engagement) -->
+                    <div class="bg-gray-800 p-5 rounded-xl shadow-lg border border-gray-700">
+                        <p class="text-sm font-medium text-gray-400">Rasio Lead ID Existing</p>
+                        <p id="metricExistingRatio" class="text-3xl font-bold text-white mt-1">0%</p>
+                        <p class="text-xs text-gray-500 mt-1">Indikator Engagement</p>
+                    </div>
+                </div>
+                
+                <!-- Kalender Aktivitas -->
+                <div class="bg-gray-800 p-4 rounded-xl shadow-lg border border-gray-700">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-white">Kalender Aktivitas</h2>
+                        <div class="flex items-center gap-2">
+                            <button id="prevMonthBtn" class="p-1 rounded-md hover:bg-gray-700 text-gray-400"><i data-lucide="chevron-left" class="h-5 w-5"></i></button>
+                            <span id="currentMonthYear" class="font-semibold w-24 text-center text-white text-sm"></span>
+                            <button id="nextMonthBtn" class="p-1 rounded-md hover:bg-gray-700 text-gray-400"><i data-lucide="chevron-right" class="h-5 w-5"></i></button>
+                        </div>
+                    </div>
+                    <div id="calendarContainer">
+                        <div class="calendar-grid">
+                            <div class="calendar-day-header">Sen</div>
+                            <div class="calendar-day-header">Sel</div>
+                            <div class="calendar-day-header">Rab</div>
+                            <div class="calendar-day-header">Kam</div>
+                            <div class="calendar-day-header">Jum</div>
+                            <div class="calendar-day-header">Sab</div>
+                            <div class="calendar-day-header">Min</div>
+                            <!-- Konten Kalender diisi oleh JS -->
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+
+            <!-- KOLOM KANAN (1/3) - Grafik Segment, Type/Capability/WinRate -->
+            <div class="lg:w-1/3 space-y-6">
+                <!-- Grafik Tipe Aktivitas (LAMA) -->
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+                    <h2 class="text-xl font-semibold mb-4 text-white">Type Aktivitas</h2>
+                    <div class="h-64 relative">
+                        <canvas id="topMeetingTypesChart"></canvas> 
+                    </div>
+                </div>
+                
+                <!-- Grafik Fokus Capability (LAMA) -->
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+                    <h2 class="text-xl font-semibold mb-4 text-white">Fokus Capability</h2>
+                    <div class="h-64 relative">
+                        <canvas id="capabilityChart"></canvas>
+                    </div>
+                </div>
+                 <!-- Grafik Win Rate (LAMA) -->
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+                    <h2 class="text-xl font-semibold mb-4 text-white">Win Rate (per Lead ID)</h2>
+                    <div class="h-64 relative">
+                        <canvas id="winRateChart"></canvas> 
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- BARIS BAWAH FULL WIDTH (Tren & Tabel Support) -->
+        <div class="space-y-6">
+             <!-- Tren Aktivitas Harian (Grafik Baru) - FULL WIDTH -->
+            <div id="dailyActivityTrendContainer" class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 hidden">
+                <div class="flex justify-between items-center mb-1">
+                    <h2 class="text-xl font-semibold text-white">Tren Fokus Aktivitas Harian</h2>
+                     <div id="trendIndicator" class="flex items-center text-sm font-semibold"></div>
+                </div>
+                 <p class="text-xs text-gray-500 mb-4">Perbandingan dengan periode sebelumnya</p>
+                <div class="h-96">
+                    <canvas id="dailyActivityChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- ANALISA SUPPORT NEEDED (Tabel Baru) - FULL WIDTH -->
+            <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 overflow-x-auto">
+                <h2 class="text-xl font-semibold text-white mb-4">Analisa Support Needed (Non-Closed Deals)</h2>
+                <div id="supportTableContainer" class="min-w-full">
+                    <!-- Tabel akan diisi oleh JS -->
+                    <table class="min-w-full divide-y divide-gray-700">
+                        <thead>
+                            <tr>
+                                <th class="whitespace-nowrap">Client</th>
+                                <th class="whitespace-nowrap">Project</th>
+                                <th class="whitespace-nowrap">Est. Amount</th>
+                                <th class="whitespace-nowrap">Support Unit</th>
+                                <th class="whitespace-nowrap">Kategori Support</th>
+                                <th class="whitespace-nowrap">Status Support</th>
+                            </tr>
+                        </thead>
+                        <tbody id="supportTableBody">
+                            <!-- Isi tabel akan diisi oleh JS -->
+                            <tr><td colspan="6" class="text-center text-gray-500 py-4">Memuat data support...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- NEW: PAGINATION CONTROLS -->
+                <div id="supportPaginationContainer" class="flex justify-between items-center mt-4">
+                    <!-- Konten diisi oleh JS -->
+                </div>
+            </div>
+            
+        </div>
+
+    </div>
+    <!-- AKHIR KONTEN UTAMA -->
+
+<!-- Modal for Update Message/Alert (Pengganti alert()) -->
+<div id="customModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center p-4 z-50">
+    <div class="bg-gray-800 p-6 rounded-lg shadow-2xl max-w-sm w-full border border-gray-700">
+        <h3 id="modalTitle" class="text-lg font-semibold text-white mb-3">Notifikasi</h3>
+        <p id="modalMessage" class="text-gray-300 mb-4"></p>
+        <div class="flex justify-end space-x-2">
+            <button id="modalCloseButton" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-150">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detail Aktivitas Hibrida (dari versi terbaru) -->
+<div id="calendarModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center p-4 z-50">
+    <div class="bg-gray-800 p-6 rounded-xl shadow-2xl max-w-lg w-full border border-gray-700 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+            <h3 id="calendarModalTitle" class="text-xl font-bold text-white">Detail Aktivitas Tanggal</h3>
+            <button id="calendarModalCloseButton" class="text-gray-400 hover:text-white p-1 rounded-full">
+                <i data-lucide="x" class="h-6 w-6"></i>
+            </button>
+        </div>
+        <div id="calendarModalContent" class="space-y-4">
+            <!-- Isi detail event di sini -->
+        </div>
+    </div>
+</div>
+<!-- Akhir Modal Kalender -->
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- KONFIGURASI APLIKASI ---
+    // URL Web App Google Apps Script Anda (URL yang Anda berikan setelah redeploy)
+    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxH6WgCs-pPWzDikVpHm3mEVBNgJhXOBpa4rQPkRAwT3dK0kOZarJ4Wp-dC6CeELA4c/exec';
+    const USE_MOCK_DATA = false; // Diatur ke FALSE, sekarang menggunakan Apps Script
+    
+    // --- STRUKTUR TIM & USER (Diambil dari Dasboard 28 oct 25.txt) ---
+    const managers = ['Toni Ardiyanto', 'Andhika Adhigunanto'];
+    const teamToni = ['Aldi Apriliano', 'Ardi Ardiansyah', 'Fitri Alifia', 'Wiwin Winarti', 'Sari Widiastuti', 'Syafitri Handayani']; 
+    const teamAndhika = ['Mayumi', 'Tomi Dwi Jans', 'Siti Maryam'];
+    const allSales = [...teamToni, ...teamAndhika];
+    
+    const managerTeamMap = {
+        'Toni Ardiyanto': teamToni,
+        'Andhika Adhigunanto': teamAndhika
+    };
+
+    const userCredentials = { 
+        'head_sales': 'Xooplyer25',
+        'Toni Ardiyanto': 'Toni123!',
+        'Andhika Adhigunanto': 'Andhika123!',
+        'Aldi Apriliano': 'aldi123!',
+        'Ardi Ardiansyah': 'ardi123!',
+        'Fitri Alifia': 'fitri123!', 
+        'Wiwin Winarti': 'wiwin123!',
+        'Sari Widiastuti': 'sari123!',
+        'Syafitri Handayani': 'syafitri123!',
+        'Mayumi': 'mayumi123!',
+        'Tomi Dwi Jans': 'tomi123!',
+        'Siti Maryam': 'siti123!'
+    };
+    // --- AKHIR STRUKTUR TIM ---
+
+    // --- STATE GLOBAL ---
+    let allDeals = []; 
+    let filteredDeals = []; 
+    let currentRole = null;
+    let currentUser = null;
+    let dailyActivityChartInstance = null;
+    let currentCalendarDate = new Date(); 
+    let charts = {}; 
+    let lastDealId = 1000; // Untuk auto-ID jika diperlukan di mock
+
+    // --- State Baru untuk Paginasi Support ---
+    let supportCurrentPage = 1;
+    const SUPPORT_ROWS_PER_PAGE = 5;
+    let currentSupportDeals = []; // Menyimpan daftar yang sudah difilter
+
+    // --- DATA WILAYAH INDONESIA (BARU) ---
+    const allWilayah = {
+        "Aceh": ["Kab. Aceh Selatan", "Kab. Aceh Tenggara", "Kab. Aceh Timur", "Kab. Aceh Tengah", "Kab. Aceh Barat", "Kab. Aceh Besar", "Kab. Pidie", "Kab. Aceh Utara", "Kab. Simeulue", "Kab. Aceh Singkil", "Kab. Bireuen", "Kab. Aceh Barat Daya", "Kab. Gayo Lues", "Kab. Aceh Jaya", "Kab. Nagan Raya", "Kab. Aceh Tamiang", "Kab. Bener Meriah", "Kab. Pidie Jaya", "Kota Banda Aceh", "Kota Sabang", "Kota Lhokseumawe", "Kota Langsa", "Kota Subulussalam"],
+        "Sumatera Utara": ["Kab. Tapanuli Tengah", "Kab. Tapanuli Utara", "Kab. Tapanuli Selatan", "Kab. Nias", "Kab. Langkat", "Kab. Karo", "Kab. Deli Serdang", "Kab. Simalungun", "Kab. Asahan", "Kab. Labuhanbatu", "Kab. Dairi", "Kab. Toba Samosir", "Kab. Mandailing Natal", "Kab. Nias Selatan", "Kab. Pakpak Bharat", "Kab. Humbang Hasundutan", "Kab. Samosir", "Kab. Serdang Bedagai", "Kab. Batubara", "Kab. Padang Lawas Utara", "Kab. Padang Lawas", "Kab. Labuhanbatu Selatan", "Kab. Labuhanbatu Utara", "Kab. Nias Utara", "Kab. Nias Barat", "Kota Medan", "Kota Pematangsiantar", "Kota Sibolga", "Kota Tanjung Balai", "Kota Binjai", "Kota Tebing Tinggi", "Kota Padangsidimpuan", "Kota Gunungsitoli"],
+        "Sumatera Barat": ["Kab. Pesisir Selatan", "Kab. Solok", "Kab. Sijunjung", "Kab. Tanah Datar", "Kab. Padang Pariaman", "Kab. Agam", "Kab. Lima Puluh Kota", "Kab. Pasaman", "Kab. Kepulauan Mentawai", "Kab. Dharmasraya", "Kab. Solok Selatan", "Kab. Pasaman Barat", "Kota Padang", "Kota Solok", "Kota Sawahlunto", "Kota Padang Panjang", "Kota Bukittinggi", "Kota Payakuh", "Kota Pariaman"],
+        "Riau": ["Kab. Kampar", "Kab. Indragiri Hulu", "Kab. Bengkalis", "Kab. Indragiri Hilir", "Kab. Pelalawan", "Kab. Rokan Hulu", "Kab. Rokan Hilir", "Kab. Siak", "Kab. Kuantan Singingi", "Kab. Kepulauan Meranti", "Kota Pekanbaru", "Kota Dumai"],
+        "Jambi": ["Kab. Kerinci", "Kab. Merangin", "Kab. Sarolangun", "Kab. Batanghari", "Kab. Muaro Jambi", "Kab. Tanjung Jabung Barat", "Kab. Tanjung Jabung Timur", "Kab. Bungo", "Kab. Tebo", "Kota Jambi", "Kota Sungai Penuh"],
+        "Sumatera Selatan": ["Kab. Ogan Komering Ulu", "Kab. Ogan Komering Ilir", "Kab. Muara Enim", "Kab. Lahat", "Kab. Musi Rawas", "Kab. Musi Banyuasin", "Kab. Banyuasin", "Kab. Ogan Komering Ulu Timur", "Kab. Ogan Komering Ulu Selatan", "Kab. Ogan Ilir", "Kab. Empat Lawang", "Kab. Penukal Abab Lematang Ilir", "Kab. Musi Rawas Utara", "Kota Palembang", "Kota Pagar Alam", "Kota Lubuk Linggau", "Kota Prabumulih"],
+        "Bengkulu": ["Kab. Bengkulu Selatan", "Kab. Rejang Lebong", "Kab. Bengkulu Utara", "Kab. Kaur", "Kab. Seluma", "Kab. Muko Muko", "Kab. Lebong", "Kab. Kepahiang", "Kab. Bengkulu Tengah", "Kota Bengkulu"],
+        "Lampung": ["Kab. Lampung Selatan", "Kab. Lampung Tengah", "Kab. Lampung Utara", "Kab. Lampung Barat", "Kab. Tulang Bawang", "Kab. Tanggamus", "Kab. Lampung Timur", "Kab. Way Kanan", "Kab. Pesawaran", "Kab. Pringsewu", "Kab. Mesuji", "Kab. Tulang Bawang Barat", "Kab. Pesisir Barat", "Kota Bandar Lampung", "Kota Metro"],
+        "Kep. Bangka Belitung": ["Kab. Bangka", "Kab. Belitung", "Kab. Bangka Selatan", "Kab. Bangka Tengah", "Kab. Bangka Barat", "Kab. Belitung Timur", "Kota Pangkal Pinang"],
+        "Kep. Riau": ["Kab. Bintan", "Kab. Karimun", "Kab. Natuna", "Kab. Lingga", "Kab. Kepulauan Anambas", "Kota Batam", "Kota Tanjung Pinang"],
+        "DKI Jakarta": ["Kab. Kepulauan Seribu", "Kota Jakarta Pusat", "Kota Jakarta Utara", "Kota Jakarta Barat", "Kota Jakarta Selatan", "Kota Jakarta Timur"],
+        "Jawa Barat": ["Kab. Bogor", "Kab. Sukabumi", "Kab. Cianjur", "Kab. Bandung", "Kab. Garut", "Kab. Tasikmalaya", "Kab. Ciamis", "Kab. Kuningan", "Kab. Cirebon", "Kab. Majalengka", "Kab. Sumedang", "Kab. Indramayu", "Kab. Subang", "Kab. Purwakarta", "Kab. Karawang", "Kab. Bekasi", "Kab. Bandung Barat", "Kab. Pangandaran", "Kota Bogor", "Kota Sukabumi", "Kota Bandung", "Kota Cirebon", "Kota Bekasi", "Kota Depok", "Kota Cimahi", "Kota Tasikmalaya", "Kota Banjar"],
+        "Jawa Tengah": ["Kab. Cilacap", "Kab. Banyumas", "Kab. Purbalingga", "Kab. Banjarnegara", "Kab. Kebumen", "Kab. Purworejo", "Kab. Wonosobo", "Kab. Magelang", "Kab. Boyolali", "Kab. Klaten", "Kab. Sukoharjo", "Kab. Wonogiri", "Kab. Karanganyar", "Kab. Sragen", "Kab. Grobogan", "Kab. Blora", "Kab. Rembang", "Kab. Pati", "Kab. Kudus", "Kab. Jepara", "Kab. Demak", "Kab. Semarang", "Kab. Temanggung", "Kab. Kendal", "Kab. Batang", "Kab. Pekalongan", "Kab. Pemalang", "Kab. Tegal", "Kab. Brebes", "Kota Magelang", "Kota Surakarta", "Kota Salatiga", "Kota Semarang", "Kota Pekalongan", "Kota Tegal"],
+        "DI Yogyakarta": ["Kab. Kulon Progo", "Kab. Bantul", "Kab. Gunung Kidul", "Kab. Sleman", "Kota Yogyakarta"],
+        "Jawa Timur": ["Kab. Pacitan", "Kab. Ponorogo", "Kab. Trenggalek", "Kab. Tulungagung", "Kab. Blitar", "Kab. Kediri", "Kab. Malang", "Kab. Lumajang", "Kab. Jember", "Kab. Banyuwangi", "Kab. Bondowoso", "Kab. Situbondo", "Kab. Probolinggo", "Kab. Pasuruan", "Kab. Sidoarjo", "Kab. Mojokerto", "Kab. Jombang", "Kab. Nganjuk", "Kab. Madiun", "Kab. Magetan", "Kab. Ngawi", "Kab. Bojonegoro", "Kab. Tuban", "Kab. Lamongan", "Kab. Gresik", "Kab. Bangkalan", "Kab. Sampang", "Kab. Pamekasan", "Kab. Sumenep", "Kota Kediri", "Kota Blitar", "Kota Malang", "Kota Probolinggo", "Kota Pasuruan", "Kota Mojokerto", "Kota Madiun", "Kota Surabaya", "Kota Batu"],
+        "Banten": ["Kab. Pandeglang", "Kab. Lebak", "Kab. Tangerang", "Kab. Serang", "Kota Tangerang", "Kota Cilegon", "Kota Serang", "Kota Tangerang Selatan"],
+        "Bali": ["Kab. Jembrana", "Kab. Tabanan", "Kab. Badung", "Kab. Gianyar", "Kab. Klungkung", "Kab. Bangli", "Kab. Karangasem", "Kab. Buleleng", "Kota Denpasar"],
+        "Nusa Tenggara Barat": ["Kab. Lombok Barat", "Kab. Lombok Tengah", "Kab. Lombok Timur", "Kab. Sumbawa", "Kab. Dompu", "Kab. Bima", "Kab. Sumbawa Barat", "Kab. Lombok Utara", "Kota Mataram", "Kota Bima"],
+        "Nusa Tenggara Timur": ["Kab. Kupang", "Kab. Timor Tengah Selatan", "Kab. Timor Tengah Utara", "Kab. Belu", "Kab. Alor", "Kab. Flores Timur", "Kab. Sikka", "Kab. Ende", "Kab. Ngada", "Kab. Manggarai", "Kab. Sumba Timur", "Kab. Sumba Barat", "Kab. Lembata", "Kab. Rote Ndao", "Kab. Manggarai Barat", "Kab. Nagekeo", "Kab. Sumba Tengah", "Kab. Sumba Barat Daya", "Kab. Manggarai Timur", "Kab. Sabu Raijua", "Kab. Malaka", "Kota Kupang"],
+        "Kalimantan Barat": ["Kab. Sambas", "Kab. Mempawah", "Kab. Sanggau", "Kab. Ketapang", "Kab. Sintang", "Kab. Kapuas Hulu", "Kab. Bengkayang", "Kab. Landak", "Kab. Sekadau", "Kab. Melawi", "Kab. Kayong Utara", "Kab. Kubu Raya", "Kota Pontianak", "Kota Singkawang"],
+        "Kalimantan Tengah": ["Kab. Kotawaringin Barat", "Kab. Kotawaringin Timur", "Kab. Kapuas", "Kab. Barito Selatan", "Kab. Barito Utara", "Kab. Katingan", "Kab. Seruyan", "Kab. Sukamara", "Kab. Lamandau", "Kab. Gunung Mas", "Kab. Pulang Pisau", "Kab. Murung Raya", "Kab. Barito Timur", "Kota Palangka Raya"],
+        "Kalimantan Selatan": ["Kab. Tanah Laut", "Kab. Kotabaru", "Kab. Banjar", "Kab. Barito Kuala", "Kab. Tapin", "Kab. Hulu Sungai Selatan", "Kab. Hulu Sungai Tengah", "Kab. Hulu Sungai Utara", "Kab. Tabalong", "Kab. Tanah Bumbu", "Kab. Balangan", "Kota Banjarmasin", "Kota Banjarbaru"],
+        "Kalimantan Timur": ["Kab. Paser", "Kab. Kutai Kartanegara", "Kab. Berau", "Kab. Kutai Barat", "Kab. Kutai Timur", "Kab. Penajam Paser Utara", "Kab. Mahakam Ulu", "Kota Balikpapan", "Kota Samarinda", "Kota Bontang"],
+        "Kalimantan Utara": ["Kab. Bulungan", "Kab. Malinau", "Kab. Nunukan", "Kab. Tana Tidung", "Kota Tarakan"],
+        "Sulawesi Utara": ["Kab. Bolaang Mongondow", "Kab. Minahasa", "Kab. Kepulauan Sangihe", "Kab. Kepulauan Talaud", "Kab. Minahasa Selatan", "Kab. Minahasa Utara", "Kab. Minahasa Tenggara", "Kab. Bolaang Mongondow Utara", "Kab. Kepulauan Siau Tagulandang Biaro", "Kab. Bolaang Mongondow Timur", "Kab. Bolaang Mongondow Selatan", "Kota Manado", "Kota Bitung", "Kota Tomohon", "Kota Kotamobagu"],
+        "Sulawesi Tengah": ["Kab. Banggai", "Kab. Poso", "Kab. Donggala", "Kab. Toli Toli", "Kab. Buol", "Kab. Morowali", "Kab. Banggai Kepulauan", "Kab. Parigi Moutong", "Kab. Tojo Una Una", "Kab. Sigi", "Kab. Banggai Laut", "Kab. Morowali Utara", "Kota Palu"],
+        "Sulawesi Selatan": ["Kab. Kepulauan Selayar", "Kab. Bulukumba", "Kab. Bantaeng", "Kab. Jeneponto", "Kab. Takalar", "Kab. Gowa", "Kab. Sinjai", "Kab. Bone", "Kab. Maros", "Kab. Pangkajene Kepulauan", "Kab. Barru", "Kab. Soppeng", "Kab. Wajo", "Kab. Sidenreng Rappang", "Kab. Pinrang", "Kab. Enrekang", "Kab. Luwu", "Kab. Tana Toraja", "Kab. Luwu Utara", "Kab. Luwu Timur", "Kab. Toraja Utara", "Kota Makassar", "Kota Pare Pare", "Kota Palopo"],
+        "Sulawesi Tenggara": ["Kab. Kolaka", "Kab. Konawe", "Kab. Muna", "Kab. Buton", "Kab. Konawe Selatan", "Kab. Bombana", "Kab. Wakatobi", "Kab. Kolaka Utara", "Kab. Konawe Utara", "Kab. Buton Utara", "Kab. Kolaka Timur", "Kab. Konawe Kepulauan", "Kab. Muna Barat", "Kab. Buton Tengah", "Kab. Buton Selatan", "Kota Kendari", "Kota Bau Bau"],
+        "Gorontalo": ["Kab. Gorontalo", "Kab. Boalemo", "Kab. Bone Bolango", "Kab. Pahuwato", "Kab. Gorontalo Utara", "Kota Gorontalo"],
+        "Sulawesi Barat": ["Kab. Mamuju", "Kab. Pasangkayu", "Kab. Polewali Mandar", "Kab. Mamasa", "Kab. Mamuju Tengah"],
+        "Maluku": ["Kab. Maluku Tengah", "Kab. Maluku Tenggara", "Kab. Kepulauan Tanimbar", "Kab. Buru", "Kab. Seram Bagian Timur", "Kab. Seram Bagian Barat", "Kab. Kepulauan Aru", "Kab. Maluku Barat Daya", "Kab. Buru Selatan", "Kota Ambon", "Kota Tual"],
+        "Maluku Utara": ["Kab. Halmahera Barat", "Kab. Halmahera Tengah", "Kab. Halmahera Utara", "Kab. Halmahera Selatan", "Kab. Kepulauan Sula", "Kab. Halmahera Timur", "Kab. Pulau Morotai", "Kab. Pulau Taliabu", "Kota Ternate", "Kota Tidore Kepulauan"],
+        "Papua": ["Kab. Merauke", "Kab. Jayawijaya", "Kab. Jayapura", "Kab. Nabire", "Kab. Kepulauan Yapen", "Kab. Biak Numfor", "Kab. Puncak Jaya", "Kab. Paniai", "Kab. Mimika", "Kab. Sarmi", "Kab. Keerom", "Kab. Waropen", "Kab. Mamberamo Raya", "Kab. Supiori", "Kab. Asmat", "Kab. Mappi", "Kab. Boven Digoel", "Kab. Yahukimo", "Kab. Pegunungan Bintang", "Kab. Tolikara", "Kab. Lanny Jaya", "Kab. Mamberamo Tengah", "Kab. Yalimo", "Kab. Nduga", "Kab. Puncak", "Kab. Dogiyai", "Kab. Intan Jaya", "Kab. Deiyai", "Kota Jayapura"],
+        "Papua Barat": ["Kab. Sorong", "Kab. Manokwari", "Kab. Fak Fak", "Kab. Kaimana", "Kab. Teluk Bintuni", "Kab. Teluk Wondama", "Kab. Sorong Selatan", "Kab. Raja Ampat", "Kab. Tambrauw", "Kab. Maybrat", "Kab. Manokwari Selatan", "Kab. Pegunungan Arfak", "Kota Sorong"],
+        "Papua Selatan": ["Kab. Merauke", "Kab. Mappi", "Kab. Asmat", "Kab. Boven Digoel"],
+        "Papua Tengah": ["Kab. Nabire", "Kab. Puncak Jaya", "Kab. Paniai", "Kab. Mimika", "Kab. Puncak", "Kab. Dogiyai", "Kab. Intan Jaya", "Kab. Deiyai"],
+        "Papua Pegunungan": ["Kab. Jayawijaya", "Kab. Pegunungan Bintang", "Kab. Yahukimo", "Kab. Tolikara", "Kab. Mamberamo Tengah", "Kab. Yalimo", "Kab. Lanny Jaya", "Kab. Nduga"],
+        "Papua Barat Daya": ["Kab. Sorong", "Kab. Sorong Selatan", "Kab. Raja Ampat", "Kab. Tambrauw", "Kab. Maybrat", "Kota Sorong"]
+    };
+    // --- AKHIR DATA WILAYAH ---
+
+    // Struktur Data untuk Support
+    const supportCategories = {
+        'Tidak perlu support': ['N/A'],
+        'Legal & Risk': ['Review Document Kontrak', 'AKC', 'AKP'],
+        'Solution & Delivery': ['Sizing project', 'Presales', 'Update Delivery'],
+        'PMO': ['Proses Invoicing dan penagihan'],
+        'Sales support': ['AM PDD', 'Sirkulir Doc kontrak']
+    };
+    
+    // DOM Elements (Diperbarui untuk mencakup kedua set ID)
+    const loginScreen=document.getElementById('loginScreen'),mainContent=document.getElementById('mainContent'),roleSelector=document.getElementById('roleSelector'),salesPersonSelectorContainer=document.getElementById('salesPersonSelectorContainer'),salesPersonSelector=document.getElementById('salesPersonSelector'),passwordInput=document.getElementById('passwordInput'),loginBtn=document.getElementById('loginBtn'),loginError=document.getElementById('loginError'),logoutBtn=document.getElementById('logoutBtn'),dashboardSubtitle=document.getElementById('dashboardSubtitle');
+    const globalPeriodFilters=document.getElementById('globalPeriodFilters'),customDateContainer=document.getElementById('customDateContainer'),startDateInput=document.getElementById('startDate'),endDateInput=document.getElementById('endDate'),managerFilterContainer=document.getElementById('managerFilterContainer'),salesFilter=document.getElementById('salesFilter');
+    const managerSelectorContainer = document.getElementById('managerSelectorContainer'); 
+    const managerSelector = document.getElementById('managerSelector'); 
+    const currentMonthYearEl = document.getElementById('currentMonthYear');
+    const inputFormContainer=document.getElementById('inputFormContainer'),activityForm=document.getElementById('activityForm'),meetingTypeSelect=document.getElementById('meetingType'),obstacleSection=document.getElementById('obstacleSection'),recurringOption=document.getElementById('recurringOption'),successMessage=document.getElementById('successMessage'),errorMessage=document.getElementById('errorMessage'),salesPersonInput=document.getElementById('salesPerson'),submitBtn=document.getElementById('submitBtn');
+    const summaryContainer = document.getElementById('summaryContainer');
+    const summaryTextEl = document.getElementById('summaryText');
+    const calendarContainer = document.getElementById('calendarContainer'), prevMonthBtn = document.getElementById('prevMonthBtn'), nextMonthBtn = document.getElementById('nextMonthBtn');
+    const trendIndicator=document.getElementById('trendIndicator');
+    const dailyActivityTrendContainer = document.getElementById('dailyActivityTrendContainer');
+    // Metrik Hibrida
+    const metricTotalMeetingsEl=document.getElementById('metricTotalMeetings'),metricNewClientsEl=document.getElementById('metricNewClients'),metricExistingClientsEl=document.getElementById('metricExistingClients'),metricTotalRFQsEl=document.getElementById('metricTotalRFQs');
+    const avgSalesCycleDurationEl = document.getElementById('avgSalesCycleDuration'), metricAvgStepsEl = document.getElementById('metricAvgSteps'), metricExistingRatioEl = document.getElementById('metricExistingRatio');
+    // Modal Hibrida
+    const calendarModal = document.getElementById('calendarModal'), calendarModalContent = document.getElementById('calendarModalContent'), calendarModalCloseButton = document.getElementById('calendarModalCloseButton');
+    // Form Input
+    const unitInChargeSelect = document.getElementById('unitInCharge');
+    const supportCategorySelect = document.getElementById('supportCategory');
+    const lokasiProvinsiSelect = document.getElementById('lokasiProvinsi');
+    const lokasiKotaSelect = document.getElementById('lokasiKota');
+    const clientSegmentSelect = document.getElementById('clientSegment'); // NEW
+
+    // --- UTILITY FUNCTIONS ---
+
+    // Format mata uang IDR
+    const formatIDR = (number) => {
+        if (number === null || number === undefined || isNaN(number)) return 'Rp 0';
+        return new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0
+        }).format(number);
+    };
+
+    // Format tanggal ke YYYY-MM-DD
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        date.setHours(12, 0, 0, 0); 
+        return date.toISOString().split('T')[0];
+    };
+    
+    // Fungsi pengganti alert() bawaan browser
+    const showCustomModal = (title, message) => {
+        const modal = document.getElementById('customModal');
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('modalMessage').textContent = message;
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    };
+
+    // Event listener untuk menutup modal
+    document.getElementById('modalCloseButton').addEventListener('click', () => {
+        const modal = document.getElementById('customModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    });
+
+    // Format input (Estimasi Amount) menjadi format ribuan saat diketik
+    function formatRupiah(input) {
+        // Ambil nilai tanpa titik
+        let value = input.value.replace(/\./g, '');
+
+        // Hanya izinkan angka
+        value = value.replace(/[^0-9]/g, '');
+
+        // Format kembali dengan titik sebagai pemisah ribuan
+        const formattedValue = value.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        input.value = formattedValue;
+    }
+    
+    // Ekspos fungsi formatRupiah ke global scope agar dapat dipanggil dari HTML oninput
+    window.formatRupiah = formatRupiah;
+
+    // Fungsi untuk mengisi dropdown (Pilihan Sales, Manager)
+    function populateDropdowns() {
+        salesPersonSelector.innerHTML = allSales.map(name => `<option value="${name}">${name}</option>`).join('');
+        managerSelector.innerHTML = managers.map(name => `<option value="${name}">${name}</option>`).join('');
+        salesPersonInput.innerHTML = allSales.map(name => `<option value="${name}">${name}</option>`).join('');
+    }
+
+    // Fungsi untuk mengisi dropdown support (Unit & Kategori)
+    function populateSupportDropdowns() {
+        // 1. Isi Unit in Charge
+        unitInChargeSelect.innerHTML = Object.keys(supportCategories)
+            .map(unit => `<option value="${unit}">${unit}</option>`)
+            .join('');
+        
+        // 2. Fungsi untuk update Kategori
+        function updateSupportCategories() {
+            const selectedUnit = unitInChargeSelect.value;
+            const categories = supportCategories[selectedUnit] || [];
+            supportCategorySelect.innerHTML = categories
+                .map(category => `<option value="${category}">${category}</option>`)
+                .join('');
+        }
+
+        // 3. Tambahkan listener ke Unit
+        unitInChargeSelect.addEventListener('change', updateSupportCategories);
+        
+        // 4. Panggil sekali
+        updateSupportCategories();
+    }
+    
+    // FUNGSI BARU UNTUK LOKASI
+    function populateWilayahDropdowns() {
+        // 1. Isi Provinsi
+        const provinsiOptions = Object.keys(allWilayah).sort().map(prov => 
+            `<option value="${prov}">${prov}</option>`
+        ).join('');
+        lokasiProvinsiSelect.innerHTML = '<option value="">-- Pilih Provinsi --</option>' + provinsiOptions;
+
+        // 2. Tambahkan listener ke Provinsi
+        lokasiProvinsiSelect.addEventListener('change', () => {
+            const selectedProv = lokasiProvinsiSelect.value;
+            lokasiKotaSelect.innerHTML = ''; 
+            
+            if (selectedProv && allWilayah[selectedProv]) {
+                const kotaOptions = allWilayah[selectedProv].sort().map(kota =>
+                    `<option value="${kota}">${kota}</option>`
+                ).join('');
+                lokasiKotaSelect.innerHTML = '<option value="">-- Pilih Kota/Kabupaten --</option>' + kotaOptions;
+            } else {
+                lokasiKotaSelect.innerHTML = '<option value="">-- Pilih Provinsi Dulu --</option>';
+            }
+        });
+    }
+
+    // --- LOGIKA DATA LOCAL STORAGE (MOCK) ---
+    // Fungsi ini dikosongkan karena kita hanya menggunakan data live
+    function getMockDealsData() { return []; } 
+    
+    // Fungsi untuk memproses data mentah (dari API/Mock) ke format internal (allDeals)
+    function processDealsData(deals) {
+        if (!deals || deals.length === 0) return [];
+        
+        return deals.map(deal => {
+             // Mapping Keys dari output Spreadsheet (Nama Kolom) ke format internal (camelCase)
+             const mappedDeal = {
+                 id: deal.ID_DEAL || deal.id || 'ID_' + Date.now() + Math.random(), // Menggunakan ID_DEAL sebagai kunci utama
+                 client: deal.Nama_Klien || deal.client,
+                 sales: deal.Nama_Sales || deal.sales,
+                 meetingType: deal.Type_Aktivitas || deal.meetingType,
+                 value: parseInt(String(deal.Nilai_Deal || deal.value).replace(/\./g, '')) || 0,
+                 recurring: deal.Recurring === true || String(deal.Recurring).toUpperCase() === 'TRUE' || deal.recurring === true,
+                 obstacle: deal.Hambatan || deal.obstacle,
+                 meetingDate: deal.Tanggal_Meeting || deal.meetingDate,
+                 notes: deal.Hasil_Meeting || deal.notes,
+                 clientType: deal.Tipe_Klien || deal.clientType,
+                 capability: deal.Capability || deal.capability,
+                 unitInCharge: deal.Unit_in_Charge || deal.unitInCharge,
+                 supportCategory: deal.Kategori_Support || deal.supportCategory,
+                 supportStatus: deal.Support_Status || deal.supportStatus,
+                 nomorRFQ: deal.ID_DEAL || deal.nomorRFQ, // Tetap gunakan ID_DEAL untuk Lead ID
+                 namaProject: deal.Nama_Project || deal.namaProject,
+                 lokasiKota: deal.Lokasi_Kota || deal.lokasiKota,
+                 lokasiProvinsi: deal.Lokasi_Provinsi || deal.lokasiProvinsi,
+                 clientSegment: deal.Client_Segment || deal.clientSegment || 'Enterprise'
+             };
+
+             // Buat objek Date
+             if (mappedDeal.meetingDate) {
+                 try {
+                     const parts = mappedDeal.meetingDate.split('-');
+                     // Saya tambahkan pengecekan parts[0].length === 4 untuk memastikan formatnya YYYY-MM-DD
+                     if (parts.length === 3 && parts[0].length === 4) {
+                         mappedDeal.meetingDateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+                         // Pengecekan tambahan jika tanggalnya tidak valid (misal: 2024-99-99)
+                         if (isNaN(mappedDeal.meetingDateObj.getTime())) {
+                            throw new Error("Tanggal tidak valid setelah di-parse");
+                         }
+                         mappedDeal.meetingDateObj.setHours(12, 0, 0, 0); 
+                     } else { 
+                        // INI BAGIAN BARU: Mencatat data yang formatnya salah
+                        console.warn('DATA DIABAIKAN (Format Tanggal Salah):', {
+                            client: mappedDeal.client, 
+                            dateString: mappedDeal.meetingDate, 
+                            leadId: mappedDeal.nomorRFQ,
+                            reason: "Format harus YYYY-MM-DD"
+                        });
+                        throw new Error("Format tanggal salah"); 
+                     }
+                 } catch (dateError) {
+                      // INI BAGIAN BARU: Mencatat data yang error
+                      console.error('DATA DIABAIKAN (Error Parsing Tanggal):', {
+                            client: mappedDeal.client, 
+                            dateString: mappedDeal.meetingDate, 
+                            leadId: mappedDeal.nomorRFQ,
+                            error: dateError.message
+                      });
+                      mappedDeal.meetingDateObj = null;
+                 }
+             } else { 
+                 // INI BAGIAN BARU: Mencatat data yang tanggalnya kosong
+                 console.warn('DATA DIABAIKAN (Tanggal Kosong):', {
+                     client: mappedDeal.client, 
+                     leadId: mappedDeal.nomorRFQ,
+                     reason: "Tanggal_Meeting kosong"
+                 });
+                 mappedDeal.meetingDateObj = null; 
+             }
+             return mappedDeal;
+
+         }).filter(d => d.meetingDateObj !== null && !isNaN(d.meetingDateObj?.getTime())); 
+    }
+
+
+    // --- LOGIKA FETCH / POST KE GOOGLE SCRIPT ---
+
+    // Mengambil data dari Google Sheet (menggunakan GET)
+    async function fetchDataFromScript() {
+        const url = `${GOOGLE_SCRIPT_URL}?action=readAll`;
+        try {
+            const response = await fetch(url);
+            const result = await response.json();
+            
+            if (result.status === 200 && result.records) {
+                // Mapping dan proses data yang diambil dari Spreadsheet
+                return processDealsData(result.records);
+            } else {
+                throw new Error(result.error || 'Gagal mengambil data dari Google Spreadsheet.');
+            }
+        } catch (error) {
+            console.error("Fetch Error:", error);
+            throw error; // Lempar error untuk ditangkap di showDashboard
+        }
+    }
+
+    // Mengirim data baru atau update status (menggunakan POST)
+    async function postDataToScript(action, payload) {
+        const url = GOOGLE_SCRIPT_URL; 
+        
+        // Payload harus diubah ke format yang diterima oleh Apps Script (JSON string)
+        const fullPayload = { action, ...payload };
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                // PERBAIKAN: Ubah Content-Type ke text/plain untuk menghindari masalah CORS/Redirect
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify(fullPayload)
+            });
+            const result = await response.json();
+            
+            if (result.status === 200) {
+                return result;
+            } else {
+                 throw new Error(result.error || 'Gagal menyimpan perubahan ke Google Spreadsheet.');
+            }
+        } catch (error) {
+             console.error("Post Error:", error);
+             showCustomModal("Error Submit Data", "Gagal mengirim data ke Spreadsheet: " + error.message);
+             throw error;
+        }
+    }
+
+
+    // --- LOGIKA UTAMA APLIKASI ---
+
+    function init() {
+        populateDropdowns();
+        populateSupportDropdowns();
+        populateWilayahDropdowns();
+        
+        // Periksa session storage untuk status login
+        currentRole = sessionStorage.getItem('salesRole');
+        currentUser = sessionStorage.getItem('salesUser');
+        
+        if (currentRole) {
+            showDashboard();
+        } else {
+            showLogin();
+        }
+        setupEventListeners();
+    }
+
+
+    // Tampilkan layar login
+    function showLogin() {
+        sessionStorage.clear();
+        currentRole = null;
+        currentUser = null;
+        
+        // Pastikan mainContent disembunyikan dan direset
+        mainContent.classList.add('hidden');
+        mainContent.classList.remove('visible'); 
+
+        loginScreen.classList.remove('hidden');
+        loginScreen.style.display = 'flex'; // Pastikan login screen terlihat
+        
+        roleSelector.value = 'sales';
+        salesPersonSelectorContainer.classList.toggle('hidden', roleSelector.value !== 'sales');
+        managerSelectorContainer.classList.toggle('hidden', roleSelector.value !== 'manager');
+        
+        passwordInput.value = '';
+        loginError.classList.add('hidden');
+    }
+
+    // Tampilkan dashboard setelah login
+    async function showDashboard() {
+        // HILANGKAN LOGIN SCREEN SEPENUHNYA
+        loginScreen.classList.add('hidden');
+        loginScreen.style.display = 'none'; 
+        
+        // TAMPILKAN LOADING (Sekarang di luar mainContent)
+        document.getElementById('loadingIndicator').classList.remove('hidden');
+        
+        // AMBIL DATA DARI SPREADSHEET (TANPA FALLBACK KE LOCAL STORAGE)
+        try {
+            allDeals = await fetchDataFromScript();
+            if (allDeals.length === 0) {
+                 // Jika fetch sukses tapi Spreadsheet kosong
+                 console.warn("Spreadsheet kosong. Dashboard akan tampil kosong.");
+            }
+        } catch (e) {
+            // Jika FETCH GAGAL (Failed to fetch), tampilkan error dan biarkan dashboard tampil kosong
+            console.error("Gagal terhubung ke Spreadsheet. Dashboard akan tampil kosong.", e);
+            allDeals = []; // Pastikan kosong
+            showCustomModal("Error Koneksi Live Data", "Gagal mengambil data dari Google Apps Script. Dashboard tampil kosong.");
+        }
+
+
+        // TAMPILKAN MAIN CONTENT (opacity 0)
+        mainContent.classList.remove('hidden');
+        // document.getElementById('loadingIndicator').classList.add('hidden'); // <-- DIPINDAHKAN
+        
+        Chart.defaults.color = '#9ca3af'; 
+        Chart.defaults.borderColor = '#374151'; 
+        
+        // Terapkan efek fade-in dengan durasi yang lebih lama (0.8s)
+        setTimeout(() => {
+            mainContent.classList.add('visible');
+            // Sembunyikan loading indicator SETELAH fade-in dimulai
+            document.getElementById('loadingIndicator').classList.add('hidden'); 
+        }, 50); 
+        
+        renderAppView();
+    }
+    
+    // Atur tampilan dashboard berdasarkan peran (role)
+    function renderAppView() {
+        let filterOptionsHtml = '';
+        
+        if (currentRole === 'manager') {
+            const myTeam = managerTeamMap[currentUser] || [];
+            filterOptionsHtml = '<option value="all">Semua Tim Saya</option>' + myTeam.map(name => `<option value="${name}">${name}</option>`).join('');
+            
+            dashboardSubtitle.textContent = `Ringkasan performa untuk tim ${currentUser}.`;
+            managerFilterContainer.classList.remove('hidden');
+            summaryContainer.classList.remove('hidden');
+            dailyActivityTrendContainer.classList.remove('hidden'); 
+            inputFormContainer.classList.add('hidden'); 
+        } else if (currentRole === 'head_sales') {
+            filterOptionsHtml = '<option value="all">Semua Sales</option>' + allSales.map(name => `<option value="${name}">${name}</option>`).join('');
+
+            dashboardSubtitle.textContent = 'Ringkasan performa seluruh tim sales.';
+            managerFilterContainer.classList.remove('hidden');
+            summaryContainer.classList.remove('hidden');
+            dailyActivityTrendContainer.classList.remove('hidden');
+            inputFormContainer.classList.add('hidden');
+        } else { // Sales Person
+            dashboardSubtitle.textContent = `Selamat datang kembali, ${currentUser}!`;
+            salesFilter.value = currentUser; // Set filter ke diri sendiri
+            managerFilterContainer.classList.add('hidden');
+            summaryContainer.classList.add('hidden'); 
+            dailyActivityTrendContainer.classList.add('hidden');
+            inputFormContainer.classList.remove('hidden');
+            
+            salesPersonInput.innerHTML = `<option value="${currentUser}">${currentUser}</option>`;
+            salesPersonInput.value = currentUser;
+            document.getElementById('meetingDate').valueAsDate = new Date();
+        }
+        
+        salesFilter.innerHTML = filterOptionsHtml;
+        
+        // Atur filter tanggal default (Bulan Ini)
+        const periodButton = globalPeriodFilters.querySelector('[data-period="this-month"]');
+        if (periodButton) {
+            globalPeriodFilters.querySelector('.active')?.classList.remove('active');
+            periodButton.classList.add('active');
+        }
+
+        const today = new Date();
+        currentCalendarDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        
+        renderFilteredDashboard();
+    }
+
+    // Fungsi untuk mengambil rentang tanggal filter
+    function getFilterDates() {
+        const selectedPeriod = globalPeriodFilters.querySelector('.active')?.dataset.period;
+        const today = new Date();
+        let startDate, endDate, prevStartDate, prevEndDate;
+        
+        today.setHours(0, 0, 0, 0);
+
+        if (selectedPeriod === 'this-week') {
+            const firstDayOfWeek = today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1); 
+            startDate = new Date(new Date(today).setDate(firstDayOfWeek));
+            endDate = new Date(new Date(startDate).setDate(startDate.getDate() + 6));
+            prevStartDate = new Date(new Date(startDate).setDate(startDate.getDate() - 7));
+            prevEndDate = new Date(new Date(endDate).setDate(endDate.getDate() - 7));
+        } else if (selectedPeriod === 'this-month') {
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            prevStartDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            prevEndDate = new Date(today.getFullYear(), today.getMonth(), 0);
+        } else if (selectedPeriod === 'custom') { 
+            startDate = new Date(startDateInput.value);
+            endDate = new Date(endDateInput.value);
+             if (!startDateInput.value || !endDateInput.value || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                return { startDate: null, endDate: null, prevStartDate: null, prevEndDate: null }; 
+            }
+            startDate.setHours(0, 0, 0, 0);
+            endDate.setHours(0, 0, 0, 0);
+            
+            const diffDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+            prevStartDate = new Date(new Date(startDate).setDate(startDate.getDate() - diffDays - 1));
+            prevEndDate = new Date(new Date(startDate).setDate(startDate.getDate() - 1));
+
+            prevStartDate.setHours(0, 0, 0, 0);
+        } else {
+             return { startDate: null, endDate: null, prevStartDate: null, prevEndDate: null }; 
+        }
+        
+        if(endDate && !isNaN(endDate)) endDate.setHours(23, 59, 59, 999);
+        if(prevEndDate && !isNaN(prevEndDate)) prevEndDate.setHours(23, 59, 59, 999);
+
+        return { startDate, endDate, prevStartDate, prevEndDate };
+    }
+
+
+    // Fungsi utama untuk me-render ulang dashboard berdasarkan filter
+    function renderFilteredDashboard() {
+        const { startDate, endDate, prevStartDate, prevEndDate } = getFilterDates();
+        
+        let salesToDisplay = []; 
+        if (currentRole === 'manager') {
+            const myTeam = managerTeamMap[currentUser] || [];
+            salesToDisplay = (salesFilter.value === 'all') ? myTeam : [salesFilter.value];
+        } else if (currentRole === 'head_sales') {
+            salesToDisplay = (salesFilter.value === 'all') ? allSales : [salesFilter.value];
+        } else { 
+            salesToDisplay = [currentUser];
+        }
+
+        if (!startDate || !endDate) {
+            filteredDeals = [];
+            prevPeriodDeals = [];
+        } else {
+            filteredDeals = allDeals.filter(deal => {
+                const dealDate = deal.meetingDateObj; 
+                if (!dealDate || isNaN(dealDate.getTime())) return false; 
+                const salesMatch = salesToDisplay.includes(deal.sales);
+                return salesMatch && dealDate >= startDate && dealDate <= endDate;
+            });
+
+             prevPeriodDeals = [];
+            if (prevStartDate && prevEndDate && !isNaN(prevStartDate.getTime()) && !isNaN(prevEndDate.getTime())) {
+                prevPeriodDeals = allDeals.filter(deal => {
+                    const dealDate = deal.meetingDateObj; 
+                     if (!dealDate || isNaN(dealDate.getTime())) return false;
+                    const salesMatch = salesToDisplay.includes(deal.sales);
+                    return salesMatch && dealDate >= prevStartDate && dealDate <= prevEndDate;
+                });
+            }
+        }
+        
+        // Hitung metrik Hibrida (PASSING salesToDisplay BARU)
+        const performanceMetrics = calculateSalesPerformance(filteredDeals, salesToDisplay);
+
+        // Panggil semua fungsi render
+        updateSalesSummary(performanceMetrics); 
+        renderMetrics(filteredDeals, performanceMetrics); 
+        
+        if (currentCalendarDate instanceof Date && !isNaN(currentCalendarDate.getTime())) {
+             renderCalendar(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth()); 
+        }
+
+        renderTopMeetingTypesChart(filteredDeals); 
+        renderCapabilityChart(filteredDeals);
+        renderWinRateChart(performanceMetrics); 
+        renderClientSegmentProgress(filteredDeals); // NEW: RENDER PROGRESS SEGMENT
+        
+        supportCurrentPage = 1; // RESET Paginasi setiap kali filter global berubah
+        renderSupportNeededTable(allDeals, salesToDisplay); 
+        
+        if (currentRole === 'manager' || currentRole === 'head_sales') {
+            renderDailyActivityTrend(filteredDeals); 
+        }
+    }
+    
+    // --- KALKULASI METRIK HIBRIDA (Diperbarui dengan salesToDisplay) ---
+    const calculateSalesPerformance = (deals, salesToDisplay) => {
+        const met = {
+            totalMeetings: 0,
+            totalRFQs: 0, wonRFQs: 0, closedRFQs: 0, totalDealValueWon: 0, rfqFromExisting: 0, 
+            totalNewClients: new Set(), totalExistingClients: new Set(), 
+            awarenessCount: 0, interestCount: 0, desireCount: 0, actionCount: 0, 
+            totalStepsWon: 0, uniqueRFQs: new Set(), wonRFQsSet: new Set(), closedRFQsSet: new Set(),
+            topCapability: 'N/A', topActivityStatus: 'N/A', avgSalesCycleDuration: 0
+        };
+        
+        const capabilityCounts = {};
+        const statusCounts = {};
+
+        deals.forEach(deal => {
+            const rfqId = deal.nomorRFQ || deal.id;
+            const status = deal.meetingType;
+            const dealValue = deal.value || 0;
+            
+            met.totalMeetings++;
+            met.uniqueRFQs.add(rfqId);
+            
+            // --- LOGIKA LAMA (DIHAPUS) ---
+            // if (deal.clientType === 'new') met.totalNewClients.add(deal.client); else met.totalExistingClients.add(deal.client);
+            // if(deal.clientType === 'existing') met.rfqFromExisting++;
+            // --- AKHIR LOGIKA LAMA ---
+
+            if (['Delivery', 'Payment', 'Action'].includes(status) && dealValue > 0) met.wonRFQsSet.add(rfqId);
+            if (['Delivery', 'Payment', 'Action', 'Lost'].includes(status)) met.closedRFQsSet.add(rfqId);
+            
+            if (status === 'Awareness') met.awarenessCount++;
+            else if (status === 'Interest') met.interestCount++;
+            else if (status === 'Desire' || status === 'ProcessClosing') met.desireCount++;
+            // PERBAIKAN 1: Lost dikeluarkan dari Action
+            else if (['Action', 'Delivery', 'Payment'].includes(status)) met.actionCount++; 
+
+            const cap = deal.capability || 'Lainnya';
+            capabilityCounts[cap] = (capabilityCounts[cap] || 0) + 1;
+            const currentStatus = deal.meetingType || 'Lainnya';
+            statusCounts[currentStatus] = (statusCounts[currentStatus] || 0) + 1;
+        });
+
+        met.topCapability = Object.entries(capabilityCounts).sort(([, a], [, b]) => b - a)[0]?.[0] || 'N/A';
+        met.topActivityStatus = Object.entries(statusCounts).sort(([, a], [, b]) => b - a)[0]?.[0] || 'N/A';
+
+        met.totalRFQs = met.uniqueRFQs.size;
+        met.wonRFQs = met.wonRFQsSet.size;
+        met.closedRFQs = met.closedRFQsSet.size;
+
+        // PERBAIKAN 2: Win Rate = (Won Lead ID / Total Lead ID Unik) * 100
+        met.winRate = met.totalRFQs > 0 ? (met.wonRFQs / met.totalRFQs) * 100 : 0;
+        
+        // --- LOGIKA BARU UNTUK KLIEN BARU / EXISTING (BERDASARKAN ASAL LEAD ID) ---
+        // Iterasi melalui Lead ID unik yang aktif di periode ini
+        met.uniqueRFQs.forEach(rfqId => {
+            // Temukan semua history meeting untuk Lead ID ini dari 'allDeals'
+            const rfqHistory = allDeals
+                .filter(d => (d.nomorRFQ || d.id) === rfqId)
+                .sort((a, b) => (a.meetingDateObj?.getTime() || 0) - (b.meetingDateObj?.getTime() || 0));
+
+            if (rfqHistory.length === 0) return;
+
+            // Dapatkan data dari meeting PERTAMA
+            const firstMeeting = rfqHistory[0];
+
+            // Tentukan status klien berdasarkan meeting PERTAMA
+            if (firstMeeting.clientType === 'new') {
+                met.totalNewClients.add(firstMeeting.client);
+            } else {
+                met.totalExistingClients.add(firstMeeting.client);
+                met.rfqFromExisting++; // Hitung Lead ID yang berasal dari Klien Existing
+            }
+        });
+        // --- AKHIR LOGIKA BARU ---
+        
+        let totalStepsForWonRFQs = 0;
+        met.wonRFQsSet.forEach(wonRfqId => {
+             const steps = allDeals.filter(d => (d.nomorRFQ || d.id) === wonRfqId).length;
+             totalStepsForWonRFQs += steps;
+        });
+        met.avgStepsWon = met.wonRFQs > 0 ? totalStepsForWonRFQs / met.wonRFQs : 0;
+        // Rasio sekarang dihitung berdasarkan LOGIKA BARU (met.rfqFromExisting)
+        met.rfqFromExistingRatio = met.totalRFQs > 0 ? (met.rfqFromExisting / met.totalRFQs) * 100 : 0;
+
+        const totalMeetingsAIDA = met.awarenessCount + met.interestCount + met.desireCount + met.actionCount; 
+        met.aida = {
+            awareness: totalMeetingsAIDA > 0 ? (met.awarenessCount / totalMeetingsAIDA) * 100 : 0,
+            interest: totalMeetingsAIDA > 0 ? (met.interestCount / totalMeetingsAIDA) * 100 : 0,
+            desire: totalMeetingsAIDA > 0 ? (met.desireCount / totalMeetingsAIDA) * 100 : 0,
+            action: totalMeetingsAIDA > 0 ? (met.actionCount / totalMeetingsAIDA) * 100 : 0 
+        };
+
+        const cycleData = calculateSalesCycle(allDeals, allSales);
+        let totalDuration = 0;
+        let totalCycles = 0;
+        
+        // Perhitungan rata-rata siklus tetap dipertahankan
+        cycleData.filter(d => salesToDisplay.includes(d.sales)).forEach(d => {
+            totalDuration += d.averageDuration * d.dealCount;
+            totalCycles += d.dealCount;
+        });
+        met.avgSalesCycleDuration = totalCycles > 0 ? Math.round(totalDuration / totalCycles) : 0;
+        
+        return met;
+    };
+    
+    // Update 4 Metrik Hibrida (dan Metrik Efisiensi)
+    function renderMetrics(filteredDeals, met) {
+        metricTotalMeetingsEl.textContent = met.totalMeetings.toLocaleString('id-ID');
+        metricNewClientsEl.textContent = met.totalNewClients.size.toLocaleString('id-ID'); 
+        metricExistingClientsEl.textContent = met.totalExistingClients.size.toLocaleString('id-ID');
+        metricTotalRFQsEl.textContent = met.totalRFQs.toLocaleString('id-ID');
+        
+        metricAvgStepsEl.textContent = met.avgStepsWon.toFixed(1);
+        metricExistingRatioEl.textContent = `${met.rfqFromExistingRatio.toFixed(1)}%`; 
+        avgSalesCycleDurationEl.textContent = met.avgSalesCycleDuration > 0 ? met.avgSalesCycleDuration : 'N/A';
+    }
+
+
+    // Update Narasi Ringkasan (Hibrida)
+    const updateSalesSummary = (met) => {
+        
+        // --- Bagian 4: AIDA Progress Bar (FIX: Dipindahkan ke atas agar berjalan untuk SEMUA ROLE) ---
+        const segments = [
+            { name: 'Awareness', value: met.aida.awareness, color: 'bg-blue-500' },
+            { name: 'Interest', value: met.aida.interest, color: 'bg-green-500' },
+            { name: 'Desire', value: met.aida.desire, color: 'bg-yellow-500' },
+            { name: 'Action', value: met.aida.action, color: 'bg-red-500' }, 
+        ];
+
+        const totalAIDA = segments.reduce((sum, s) => sum + s.value, 0);
+        
+        const progressBarContainer = document.getElementById('aidaProgressBar');
+        if (progressBarContainer) {
+            const progressBarHtml = segments.map(s => {
+                const percentLabel = s.value.toFixed(1) + '%';
+                const adjustedValue = totalAIDA > 0 ? (s.value / totalAIDA) * 100 : 0;
+                return `<div class="progress-segment ${s.color} flex items-center justify-center text-xs font-bold text-white" style="width: ${adjustedValue.toFixed(1)}%;" title="${s.name}: ${s.value.toFixed(1)}%">${adjustedValue >= 5 ? percentLabel : ''}</div>`;
+            }).join('');
+            progressBarContainer.innerHTML = progressBarHtml;
+
+            const legendHtml = segments.map(s => `
+                <div class="flex flex-col">
+                    <span class="text-xs text-gray-500">${s.name}</span>
+                    <span class="text-base font-semibold text-white">${s.value.toFixed(1)}%</span>
+                </div>
+            `).join('');
+            document.getElementById('aidaLegend').innerHTML = legendHtml;
+        }
+
+        // --- Bagian 3: Ringkasan Naratif (Hanya untuk Manager/Head Sales) ---
+        if(currentRole === 'sales') return; // FIX: Pengecekan 'sales' dipindah ke sini
+        
+        const topCap = met.topCapability;
+        const topStatus = met.topActivityStatus;
+        const winRateStatus = met.winRate > 30 ? 'sangat efektif' : met.winRate > 15 ? 'cukup baik' : 'perlu ditingkatkan';
+        const avgStepsStatus = met.avgStepsWon < 4 && met.avgStepsWon > 0 ? 'sangat efisien' : met.avgStepsWon < 6 && met.avgStepsWon > 0 ? 'efisien' : 'cenderung lambat';
+        const existingRatioStatus = met.rfqFromExistingRatio > 40 ? 'tinggi, menunjukkan engagement yang kuat' : met.rfqFromExistingRatio > 20 ? 'sedang, dengan potensi cross-selling yang baik' : 'rendah, fokus utama pada akuisisi klien baru';
+        
+        if (summaryTextEl) {
+             summaryTextEl.innerHTML = `
+                Dalam periode ini, Sales Person yang terpilih (<b>${met.totalMeetings.toLocaleString('id-ID')} meeting</b> dari <b>${met.totalRFQs.toLocaleString('id-ID')} Lead ID unik</b>) menunjukkan <b>Efektivitas Kinerja</b> yang baik.
+                <br><br>
+                Fokus utama Sales Person adalah pada Capability <b>${topCap}</b> dan aktivitas yang paling sering dilakukan adalah tahap <b>${topStatus}</b> dalam pipeline.
+                <br><br>
+                <b>Win Rate</b> (berdasarkan Total Lead ID Unik) berada di <b>${met.winRate.toFixed(1)}%</b>, yang berarti ${winRateStatus} dalam mengubah peluang menjadi kemenangan.
+                <br>
+                Untuk <b>Efisiensi Siklus Penjualan</b>, rata-rata deal yang dimenangkan hanya membutuhkan <b>${met.avgStepsWon.toFixed(1)} meeting</b> untuk bergerak dari awal hingga closing, menunjukkan proses yang ${avgStepsStatus}.
+                <br>
+                Sementara itu, <b>Rasio Lead ID Existing</b> (indikator Engagement) mencapai <b>${met.rfqFromExistingRatio.toFixed(1)}%</b>. Rasio ini ${existingRatioStatus}.
+            `;
+        }
+    };
+    
+    // Render Grafik Tren Aktivitas Harian (Dasboard Hibrida)
+    const renderDailyActivityTrend = (deals) => {
+        const ctx = document.getElementById('dailyActivityChart')?.getContext('2d');
+        if (!ctx) return;
+        
+        const { startDate, endDate } = getFilterDates();
+        if (!startDate || !endDate) return; 
+        
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(0, 0, 0, 0);
+
+        const activityMap = {}; 
+        
+        deals.forEach(deal => {
+            const dateKey = formatDate(deal.meetingDateObj);
+            
+            activityMap[dateKey] = activityMap[dateKey] || { newRfqNewClient: 0, newRfqExistingClient: 0, existingRfq: 0 };
+            
+            const dealHistory = allDeals.filter(d => (d.nomorRFQ || d.id) === (deal.nomorRFQ || deal.id)).sort((a, b) => (a.meetingDateObj?.getTime() || 0) - (b.meetingDateObj?.getTime() || 0));
+            
+            const isFirstMeeting = dealHistory.length > 0 && dealHistory[0].meetingDate === deal.meetingDate;
+
+            if (isFirstMeeting) {
+                if (deal.clientType === 'new') {
+                    activityMap[dateKey].newRfqNewClient++; 
+                } else {
+                    activityMap[dateKey].newRfqExistingClient++; 
+                }
+            } else {
+                activityMap[dateKey].existingRfq++; 
+            }
+        });
+        
+        const labels = [];
+        const newRfqNewClientData = [];
+        const newRfqExistingClientData = [];
+        const existingRfqData = [];
+
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            const dateString = formatDate(d.toISOString());
+            labels.push(d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }));
+            
+            const data = activityMap[dateString] || { newRfqNewClient: 0, newRfqExistingClient: 0, existingRfq: 0 };
+            
+            newRfqNewClientData.push(data.newRfqNewClient);
+            newRfqExistingClientData.push(data.newRfqExistingClient);
+            existingRfqData.push(data.existingRfq);
+        }
+
+        if (dailyActivityChartInstance) {
+            dailyActivityChartInstance.destroy();
+        }
+
+        dailyActivityChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Lead ID Baru (New Client)',
+                        data: newRfqNewClientData,
+                        borderColor: '#3b82f6', 
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 3,
+                    },
+                    {
+                        label: 'Lead ID Baru (Existing Client)',
+                        data: newRfqExistingClientData,
+                        borderColor: '#f97316', 
+                        backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 3,
+                    },
+                    {
+                        label: 'Lead ID Existing (Pipeline Management)',
+                        data: existingRfqData,
+                        borderColor: '#10b981', 
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 3,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'top', labels: { color: '#e5e7eb' } } },
+                scales: {
+                    x: { type: 'category', grid: { display: false }, ticks: { color: '#9ca3af', maxRotation: 45, minRotation: 0 } },
+                    y: { beginAtZero: true, title: { display: true, text: 'Jumlah Meeting Harian', color: '#9ca3af' }, ticks: { color: '#9ca3af', precision: 0 }, grid: { color: '#374151' } }
+                }
+            }
+        });
+    };
+    
+    // Render Grafik Tipe Aktivitas (Doughnut)
+    function renderTopMeetingTypesChart(deals){
+        const ctx=document.getElementById('topMeetingTypesChart')?.getContext('2d');
+        if (!ctx) return; 
+        
+        const typeCounts=deals.reduce((acc,deal)=>{const type=deal.meetingType||'Lainnya';acc[type]=(acc[type]||0)+1;return acc},{});
+        const sortedTypes=Object.entries(typeCounts).sort(([,a],[,b])=>b-a);
+        const labels=sortedTypes.map(entry=>entry[0]);
+        const data=sortedTypes.map(entry=>entry[1]);
+
+        if(charts.topTypes) charts.topTypes.destroy();
+        charts.topTypes=new Chart(ctx,{
+            type:'doughnut', 
+            data:{
+                labels:labels,
+                datasets:[{
+                    label:'Jumlah',
+                    data:data,
+                    backgroundColor: [
+                        '#3b82f6', '#10b981', '#f59e0b', '#ef4444', 
+                        '#8b5cf6', '#a3a3a3' 
+                    ],
+                    borderColor: '#1f2937', 
+                    borderWidth: 2
+                }]
+            },
+            options:{
+                responsive:true,
+                maintainAspectRatio: false,
+                plugins:{ legend:{ position: 'bottom', labels: { color: '#a1a1aa' } } }
+            }
+        });
+    }
+
+    // Render Grafik Fokus Capability (Doughnut)
+    function renderCapabilityChart(deals) {
+        const ctx = document.getElementById('capabilityChart')?.getContext('2d');
+        if (!ctx) return;
+
+        const capabilityCounts = deals.reduce((acc, deal) => {
+            const cap = deal.capability || 'Belum Ditentukan';
+            acc[cap] = (acc[cap] || 0) + 1;
+            return acc;
+        }, {});
+
+        const labels = Object.keys(capabilityCounts);
+        const data = Object.values(capabilityCounts);
+
+        if (charts.capability) charts.capability.destroy();
+        charts.capability = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Fokus Capability',
+                    data: data,
+                    backgroundColor: [
+                        '#10b981', '#3b82f6', '#f59e0b', '#ef4444' 
+                    ],
+                    borderColor: '#1f2937',
+                    borderWidth: 2,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { color: '#a1a1aa' } } }
+            }
+        });
+    }
+    
+    // NEW: Render Grafik Segment Klien (Progress Bar)
+    function renderClientSegmentProgress(deals) {
+        const segmentCounts = deals.reduce((acc, deal) => {
+            const segment = deal.clientSegment || 'Enterprise'; 
+            acc[segment] = (acc[segment] || 0) + 1;
+            return acc;
+        }, {});
+        
+        const totalMeetings = deals.length;
+
+        const segmentsData = [
+            { name: 'Enterprise', count: segmentCounts['Enterprise'] || 0, color: 'bg-purple-500' },
+            { name: 'Government', count: segmentCounts['Government'] || 0, color: 'bg-orange-500' },
+            { name: 'Education', count: segmentCounts['Education'] || 0, color: 'bg-cyan-500' },
+        ];
+        
+        const segments = segmentsData.map(s => {
+            const percentage = totalMeetings > 0 ? (s.count / totalMeetings) * 100 : 0;
+            const percentLabel = percentage.toFixed(1) + '%';
+            const adjustedValue = totalMeetings > 0 ? (s.count / totalMeetings) * 100 : 0;
+            
+            return {
+                ...s,
+                percentage: percentage,
+                adjustedValue: adjustedValue,
+                percentLabel: percentLabel
+            };
+        });
+
+        const progressBarContainer = document.getElementById('clientSegmentProgressBar');
+        if (progressBarContainer) {
+            const progressBarHtml = segments.map(s => {
+                return `<div class="progress-segment ${s.color} flex items-center justify-center text-xs font-bold text-white" style="width: ${s.adjustedValue.toFixed(1)}%;" title="${s.name}: ${s.count} Meetings">${s.adjustedValue >= 5 ? s.percentLabel : ''}</div>`;
+            }).join('');
+            progressBarContainer.innerHTML = progressBarHtml;
+
+            const legendHtml = segments.map(s => `
+                <div class="flex flex-col">
+                    <span class="text-xs text-gray-500">${s.name}</span>
+                    <span class="text-base font-semibold text-white">${s.percentage.toFixed(1)}%</span>
+                </div>
+            `).join('');
+            document.getElementById('clientSegmentLegend').innerHTML = legendHtml;
+        }
+    }
+
+
+    // Render Grafik Win Rate (Doughnut dengan Label Tengah)
+    const renderWinRateChart = (met) => {
+         const ctx = document.getElementById('winRateChart')?.getContext('2d');
+         if (!ctx) return;
+         
+         // NOTE: Win Rate dihitung sebagai (WON / TOTAL UNIK LEAD ID)
+         const totalRFQs = met.totalRFQs;
+         const wonRFQs = met.wonRFQs;
+         const lostClosedRFQs = met.closedRFQsSet.size - met.wonRFQs; // Jumlah Lead ID yang Closed (Lost)
+         
+         const wonPercentage = totalRFQs > 0 ? (wonRFQs / totalRFQs) * 100 : 0;
+         // Hitung persentase Lost/Closed berdasarkan Total Lead ID Unik
+         const lostClosedPercentage = totalRFQs > 0 ? (lostClosedRFQs / totalRFQs) * 100 : 0;
+
+
+         if (charts.winRate) charts.winRate.destroy();
+         charts.winRate = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Won Lead ID', 'Lost/Closed Lead ID', 'Pending/In Process'],
+                datasets: [{
+                    // Menggunakan persentase dari Total Lead ID Unik
+                    data: [met.wonRFQs, lostClosedRFQs, (totalRFQs - met.wonRFQs - lostClosedRFQs)], 
+                    backgroundColor: ['#10b981', '#ef4444', '#f59e0b'], // Won, Lost, Pending/In Process
+                    borderColor: '#1f2937',
+                    borderWidth: 3
+                }]
+            },
+            options: {
+                 responsive: true,
+                 maintainAspectRatio: false,
+                 cutout: '70%',
+                 plugins: { legend: { position: 'bottom', labels: { color: '#a1a1aa' } } }
+            }
+         });
+         
+         const chartArea = ctx.canvas.parentNode;
+         let winRateLabel = chartArea.querySelector('#winRateCenterLabel');
+         if (!winRateLabel) {
+             winRateLabel = document.createElement('div');
+             winRateLabel.id = 'winRateCenterLabel';
+             winRateLabel.className = 'absolute inset-0 flex flex-col items-center justify-center pointer-events-none';
+             chartArea.style.position = 'relative'; 
+             chartArea.appendChild(winRateLabel);
+         }
+         winRateLabel.innerHTML = `
+             <span class="text-3xl font-bold text-white">${wonPercentage.toFixed(1)}%</span>
+             <span class="text-sm text-gray-400 mt-1">Win Rate</span>
+         `;
+    }
+    
+    // Render Tabel Support Needed (Tampilan Hibrida)
+    function renderSupportNeededTable(allDeals, salesToDisplay) {
+        
+        let dealsToProcess = allDeals;
+        if(currentRole === 'sales'){
+            dealsToProcess = allDeals.filter(d => d.sales === currentUser);
+        } else if (salesFilter.value !== 'all') {
+            dealsToProcess = allDeals.filter(d => d.sales === salesFilter.value);
+        } else if (currentRole === 'manager') {
+            const myTeam = managerTeamMap[currentUser] || [];
+            dealsToProcess = allDeals.filter(d => myTeam.includes(d.sales));
+        } else if (currentRole === 'head_sales' && salesFilter.value === 'all') {
+             dealsToProcess = allDeals; // Semua deal
+        }
+
+
+        const latestDealsMap = new Map();
+        dealsToProcess.forEach(deal => {
+            const key = deal.nomorRFQ || deal.id;
+            // Pastikan dealDateObj ada dan valid
+            const dealDate = deal.meetingDateObj?.getTime();
+
+            if (dealDate && (!latestDealsMap.has(key) || dealDate > (latestDealsMap.get(key).meetingDateObj?.getTime() || 0))) {
+                latestDealsMap.set(key, deal);
+            }
+        });
+
+        // HITUNG DAFTAR LENGKAP SEKALI SAJA, dan simpan di global
+        currentSupportDeals = Array.from(latestDealsMap.values()).filter(deal => 
+            deal.supportStatus === 'On Process' 
+        ).sort((a, b) => b.value - a.value); 
+
+        // Panggil fungsi display yang baru untuk merender tabel + paginasi
+        displayPaginatedSupportTable();
+    }
+
+    // --- FUNGSI BARU: Untuk Menampilkan Tabel Support + Paginasi ---
+    function displayPaginatedSupportTable() {
+        const tableBody = document.getElementById('supportTableBody');
+        const paginationContainer = document.getElementById('supportPaginationContainer');
+        let tableHTML = '';
+        let paginationHTML = '';
+
+        const totalDeals = currentSupportDeals.length;
+        const totalPages = Math.ceil(totalDeals / SUPPORT_ROWS_PER_PAGE);
+
+        // Pastikan halaman saat ini valid (jika data difilter ulang dan halaman berkurang)
+        if (supportCurrentPage > totalPages && totalPages > 0) {
+            supportCurrentPage = totalPages;
+        } else if (totalPages === 0) {
+            supportCurrentPage = 1;
+        }
+        
+        // Ambil data untuk halaman ini
+        const startIndex = (supportCurrentPage - 1) * SUPPORT_ROWS_PER_PAGE;
+        const endIndex = startIndex + SUPPORT_ROWS_PER_PAGE;
+        const paginatedDeals = currentSupportDeals.slice(startIndex, endIndex);
+
+        // Render Baris Tabel
+        if (totalDeals === 0) {
+            tableHTML = `
+                <tr><td colspan="6" class="text-center text-gray-500 py-4">Tidak ada Lead ID aktif yang membutuhkan support.</td></tr>
+            `;
+        } else {
+            tableHTML = paginatedDeals.map(deal => {
+                let statusColor;
+                if (deal.supportStatus === 'On Process') {
+                    statusColor = 'bg-yellow-800 text-yellow-300';
+                } else if (deal.supportStatus === 'Solved') {
+                    statusColor = 'bg-emerald-800 text-emerald-300';
+                } else {
+                    statusColor = 'bg-gray-700 text-gray-400';
+                }
+
+                return `
+                    <tr>
+                        <td class="whitespace-nowrap font-medium text-white">${deal.client}</td>
+                        <td class="whitespace-nowrap">${deal.namaProject || 'N/A'}</td>
+                        <td class="whitespace-nowrap font-semibold">${formatIDR(deal.value)}</td>
+                        <td class="whitespace-nowrap">${deal.unitInCharge || 'N/A'}</td>
+                        <td class="whitespace-nowrap">${deal.supportCategory || 'N/A'}</td>
+                        <td class="whitespace-nowrap">
+                            ${currentRole === 'sales' ? `
+                                <select class="support-status-select w-full rounded-md border-gray-600 bg-gray-700 p-2 text-xs text-white" data-id="${deal.id}">
+                                    <option value="On Process" ${deal.supportStatus === 'On Process' ? 'selected' : ''}>On Process</option>
+                                    <option value="Solved" ${deal.supportStatus === 'Solved' ? 'selected' : ''}>Solved</option>
+                                </select>`
+                            : `<span class="px-3 py-1 text-xs rounded-full ${statusColor}">${deal.supportStatus}</span>`}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        tableBody.innerHTML = tableHTML;
+
+        // Render Kontrol Paginasi
+        if (totalDeals > SUPPORT_ROWS_PER_PAGE) {
+            paginationHTML = `
+                <span class="text-sm text-gray-400">
+                    Total: ${totalDeals} item
+                </span>
+                <div class="flex items-center gap-2">
+                    <button id="supportPrevBtn" class="px-3 py-1.5 rounded-md bg-gray-700 text-gray-300 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium" ${supportCurrentPage === 1 ? 'disabled' : ''}>
+                        <i class="h-4 w-4" data-lucide="chevron-left" style="pointer-events: none;"></i>
+                    </button>
+                    <span class="text-sm text-gray-400 font-medium">
+                        Hal ${supportCurrentPage} dari ${totalPages}
+                    </span>
+                    <button id="supportNextBtn" class="px-3 py-1.5 rounded-md bg-gray-700 text-gray-300 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium" ${supportCurrentPage >= totalPages ? 'disabled' : ''}>
+                        <i class="h-4 w-4" data-lucide="chevron-right" style="pointer-events: none;"></i>
+                    </button>
+                </div>
+            `;
+            paginationContainer.innerHTML = paginationHTML;
+            lucide.createIcons(); // Panggil lucide lagi untuk merender ikon chevron
+        } else if (totalDeals > 0) {
+             paginationHTML = `
+                <span class="text-sm text-gray-400">
+                    Total: ${totalDeals} item
+                </span>
+            `;
+            paginationContainer.innerHTML = paginationHTML;
+        } else {
+            paginationContainer.innerHTML = ''; // Kosongkan jika tidak ada data
+        }
+    }
+    
+    // --- KALENDER (Diperbarui dengan logika Hibrida) ---
+    const getMonthNames = () => ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    const getDayNames = () => ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    
+    // Modal Hibrida: Detail Aktivitas Tanggal
+    const showCalendarModal = (dateString) => {
+        const modal = calendarModal;
+        const modalTitle = document.getElementById('calendarModalTitle');
+        const modalContent = calendarModalContent;
+        
+        let date = null;
+        try {
+            const parts = dateString.split('-');
+            date = new Date(parts[0], parts[1] - 1, parts[2]);
+            date.setHours(0, 0, 0, 0);
+        } catch (e) { return; }
+
+        let salesToDisplay = [currentUser];
+        if (currentRole === 'manager') {
+            salesToDisplay = (salesFilter.value === 'all') ? (managerTeamMap[currentUser] || []) : [salesFilter.value];
+        } else if (currentRole === 'head_sales') {
+            salesToDisplay = (salesFilter.value === 'all') ? allSales : [salesFilter.value];
+        }
+
+        const dealsOnThisDay = allDeals.filter(deal => {
+            const salesMatch = salesToDisplay.includes(deal.sales);
+            let dealDateNormalized = null;
+            if (deal.meetingDateObj instanceof Date && !isNaN(deal.meetingDateObj)) {
+                dealDateNormalized = new Date(deal.meetingDateObj);
+                dealDateNormalized.setHours(0,0,0,0);
+            }
+            return salesMatch && dealDateNormalized && dealDateNormalized.getTime() === date.getTime();
+        }).sort((a, b) => (a.client || '').localeCompare(b.client || ''));
+
+        modalTitle.textContent = `Aktivitas Tanggal ${date.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`;
+
+        let contentHTML = '';
+        if (dealsOnThisDay.length === 0) {
+            contentHTML = '<p class="text-gray-400">Tidak ada aktivitas terdaftar pada tanggal ini.</p>';
+        } else {
+            contentHTML = dealsOnThisDay.map(deal => {
+                const statusClass = `status-${deal.meetingType.replace(/\s/g, '')}`;
+                return `
+                <div class="bg-gray-700 p-4 rounded-lg border-l-4 border-blue-500 shadow-md">
+                    <p class="text-lg font-semibold text-white">${deal.client} (${deal.sales})</p>
+                    <p class="text-sm text-gray-300">
+                        <span class="font-medium text-blue-300">Lead ID:</span> ${deal.nomorRFQ || 'N/A'} 
+                        <span class="ml-4 font-medium text-blue-300">Status:</span> 
+                        <span class="status-label ${statusClass}">${deal.meetingType}</span>
+                    </p>
+                    <p class="text-sm text-gray-400">Project: ${deal.namaProject || 'N/A'}</p>
+                    <p class="text-sm text-gray-400">Capability: ${deal.capability || 'N/A'}</p>
+                    <p class="text-xs text-gray-500 mt-2">Estimasi Amount: ${formatIDR(deal.value)} | Segmen: ${deal.clientSegment} | Klien ${deal.clientType === 'new' ? 'Baru' : 'Existing'}</p>
+                    <p class="text-xs text-gray-400 mt-1">Support: ${deal.unitInCharge} (${deal.supportStatus})</p>
+                    <p class="mt-2 text-sm text-white bg-gray-600 p-2 rounded">${deal.notes || 'Tidak ada catatan.'}</p>
+                </div>
+            `;
+            }).join('');
+        }
+
+        modalContent.innerHTML = contentHTML;
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        lucide.createIcons();
+    };
+    
+    // Modal Hibrida: Tombol Tutup
+    calendarModalCloseButton.addEventListener('click', () => {
+        calendarModal.classList.add('hidden');
+        calendarModal.classList.remove('flex');
+    });
+
+    // Menerima dateString untuk diteruskan ke showCalendarModal
+    const renderCalendarEvent = (deal) => {
+         const clientName = deal.client ? deal.client.substring(0, 10) : 'N/A';
+         const dateString = formatDate(deal.meetingDateObj);
+         // Setiap event di kalender sekarang memanggil showCalendarModal
+         return `
+            <div class="calendar-event" onclick="window.showCalendarModal('${dateString}')" title="${deal.client} - ${deal.meetingType}"> 
+                ${clientName}... (${deal.meetingType})
+            </div>
+         `;
+    }
+    
+    // Ekspos fungsi ke scope global agar dapat dipanggil dari HTML inline onclick
+    window.showCalendarModal = showCalendarModal;
+    
+    // Render Kalender (Logic Hibrida)
+    function renderCalendar(year, month) {
+        const monthNames = getMonthNames();
+        currentMonthYearEl.textContent = `${monthNames[month]} ${year}`;
+
+        const firstDayOfMonthObj = new Date(year, month, 1);
+        const firstDay = firstDayOfMonthObj.getDay(); 
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const today = new Date();
+        today.setHours(0,0,0,0); 
+
+        let calendarHTML = `<div class="calendar-grid">`;
+        let date = 1;
+        const dayOffset = (firstDay === 0) ? 6 : firstDay - 1; 
+
+        let salesToDisplay = [currentUser];
+        if (currentRole === 'manager') {
+            salesToDisplay = (salesFilter.value === 'all') ? (managerTeamMap[currentUser] || []) : [salesFilter.value];
+        } else if (currentRole === 'head_sales') {
+            salesToDisplay = (salesFilter.value === 'all') ? allSales : [salesFilter.value];
+        }
+
+        for (let i = 0; i < 6; i++) { 
+            for (let j = 0; j < 7; j++) {
+                if (i === 0 && j < dayOffset) {
+                    calendarHTML += `<div class="calendar-cell other-month"></div>`; 
+                } else if (date > daysInMonth) {
+                     calendarHTML += `<div class="calendar-cell other-month"></div>`; 
+                } else {
+                    const currentDate = new Date(year, month, date);
+                    currentDate.setHours(0,0,0,0); 
+                    const isToday = currentDate.getTime() === today.getTime();
+                    
+                    const dateString = formatDate(currentDate.toISOString());
+
+                    const dealsOnThisDay = allDeals.filter(deal => {
+                         const salesMatch = salesToDisplay.includes(deal.sales);
+                         let dealDateNormalized = null;
+                         if (deal.meetingDateObj instanceof Date && !isNaN(deal.meetingDateObj)) {
+                            dealDateNormalized = new Date(deal.meetingDateObj);
+                            dealDateNormalized.setHours(0,0,0,0);
+                         }
+                         return salesMatch && dealDateNormalized && dealDateNormalized.getTime() === currentDate.getTime();
+                    });
+
+                    let eventsHTML = '';
+                    const maxEventsToShow = 2; // Batasi 2 event di cell
+                    
+                    const dealsToShow = dealsOnThisDay.slice(0, maxEventsToShow);
+                    eventsHTML = dealsToShow.map(deal => renderCalendarEvent(deal)).join('');
+                    
+                    if (dealsOnThisDay.length > maxEventsToShow) {
+                         const remainingCount = dealsOnThisDay.length - maxEventsToShow;
+                         // Tombol 'lainnya' juga memanggil showCalendarModal
+                         eventsHTML += `<div class="calendar-others" onclick="window.showCalendarModal('${dateString}')" title="Lihat detail">${'+' + remainingCount + ' lainnya'}</div>`;
+                    }
+
+                    calendarHTML += `
+                        <div class="calendar-cell ${isToday ? 'today' : ''}">
+                            <div class="calendar-date">${date}</div>
+                            ${eventsHTML}
+                        </div>`;
+                    date++;
+                }
+            }
+             if (date > daysInMonth) { break; }
+        }
+        calendarHTML += `</div>`;
+
+        const oldGrid = calendarContainer.querySelector('.calendar-grid');
+        if (oldGrid) oldGrid.remove();
+        calendarContainer.insertAdjacentHTML('beforeend', calendarHTML); 
+        lucide.createIcons();
+    }
+    
+    // Kalkulasi Rata-rata Durasi Sales Cycle (Diambil dari Dasboard 28 oct 25.txt)
+    function calculateSalesCycle(allDeals, salesToDisplay) { 
+        const relevantDeals = allDeals.filter(d => d.sales && salesToDisplay.includes(d.sales));
+        
+        const rfqGroups = relevantDeals.reduce((acc, deal) => {
+            const rfq = deal.nomorRFQ || deal.id;
+            if (!rfq) return acc;
+            acc[rfq] = acc[rfq] || [];
+            acc[rfq].push(deal);
+            return acc;
+        }, {});
+        
+        const salesData = {};
+        
+        for(const rfq in rfqGroups){
+            const rfqDeals = rfqGroups[rfq].sort((a,b) => (a.meetingDateObj?.getTime() || 0) - (b.meetingDateObj?.getTime() || 0));
+            
+            const awarenessDeal = rfqDeals.find(d => d.meetingType === 'Awareness');
+            const actionDeal = rfqDeals.find(d => d.meetingType === 'Action');
+
+            if(awarenessDeal && actionDeal && awarenessDeal.meetingDateObj && actionDeal.meetingDateObj){
+                const awarenessDate = awarenessDeal.meetingDateObj;
+                const actionDate = actionDeal.meetingDateObj;
+                if (isNaN(awarenessDate.getTime()) || isNaN(actionDate.getTime())) continue; 
+
+                const duration = Math.ceil((actionDate - awarenessDate) / (1000 * 60 * 60 * 24));
+                const closingSales = actionDeal.sales;
+                
+                if(duration >= 0){
+                    salesData[closingSales] = salesData[closingSales] || { totalDuration: 0, dealCount: 0 };
+                    salesData[closingSales].totalDuration += duration;
+                    salesData[closingSales].dealCount++;
+                }
+            }
+        }
+        
+        const result = [];
+        for(const salesName in salesData){
+            const data = salesData[salesName];
+            if (data.dealCount > 0) {
+                 result.push({
+                    sales: salesName,
+                    dealCount: data.dealCount,
+                    averageDuration: Math.round(data.totalDuration / data.dealCount)
+                 });
+             }
+        }
+        return result;
+    }
+
+    // --- Event Listeners ---
+    function setupEventListeners() {
+        // Filter Periode (Minggu, Bulan, Custom)
+        globalPeriodFilters.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                globalPeriodFilters.querySelector('.active')?.classList.remove('active');
+                e.target.classList.add('active');
+                customDateContainer.classList.toggle('hidden', e.target.dataset.period !== 'custom');
+                if (e.target.dataset.period !== 'custom') {
+                     const { startDate } = getFilterDates();
+                     if (startDate && !isNaN(startDate.getTime())) {
+                        currentCalendarDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+                     }
+                     renderFilteredDashboard();
+                }
+            }
+        });
+        
+        // Listener untuk filter tanggal custom dan filter sales
+        [startDateInput, endDateInput, salesFilter].forEach(el => el.addEventListener('change',() => {
+             const { startDate } = getFilterDates();
+             if (startDate && !isNaN(startDate.getTime())) {
+                currentCalendarDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+             }
+             renderFilteredDashboard();
+        }));
+        
+        // Tombol navigasi kalender
+        prevMonthBtn.addEventListener('click', () => {
+             if (currentCalendarDate instanceof Date && !isNaN(currentCalendarDate.getTime())) {
+                currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+                renderCalendar(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth());
+            }
+        });
+        nextMonthBtn.addEventListener('click', () => {
+             if (currentCalendarDate instanceof Date && !isNaN(currentCalendarDate.getTime())) {
+                currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+                renderCalendar(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth());
+            }
+        });
+        
+        // Logika dropdown login
+        roleSelector.addEventListener('change', () => {
+            const role = roleSelector.value;
+            salesPersonSelectorContainer.classList.toggle('hidden', role !== 'sales');
+            managerSelectorContainer.classList.toggle('hidden', role !== 'manager');
+        });
+
+        // Tombol Login
+        loginBtn.addEventListener('click', () => { 
+            const role = roleSelector.value;
+            const password = passwordInput.value;
+            let user, expectedPassword;
+
+            if (role === 'sales') {
+                user = salesPersonSelector.value;
+                expectedPassword = userCredentials[user];
+            } else if (role === 'manager') {
+                user = managerSelector.value;
+                expectedPassword = userCredentials[user];
+            } else if (role === 'head_sales') {
+                user = 'Head Sales';
+                expectedPassword = userCredentials['head_sales'];
+            }
+            
+            if (password === expectedPassword) {
+                sessionStorage.setItem('salesRole', role);
+                sessionStorage.setItem('salesUser', user);
+                currentRole = role;
+                currentUser = user;
+                showDashboard();
+            } else {
+                loginError.classList.remove('hidden');
+                passwordInput.value = '';
+            }
+        });
+        passwordInput.addEventListener('input', () => loginError.classList.add('hidden'));
+        logoutBtn.addEventListener('click', showLogin);
+
+        // Form: Tampilkan/sembunyikan 'Recurring' dan 'Obstacle'
+        meetingTypeSelect.addEventListener('change',e=>{
+            const selectedType = e.target.value;
+            recurringOption.classList.toggle('hidden', !['Action', 'Delivery', 'Payment'].includes(selectedType));
+            obstacleSection.classList.toggle('hidden', selectedType !== 'Lost');
+        });
+        
+        // Form: Submit Aktivitas Baru
+        activityForm.addEventListener('submit', async (e) => { 
+            e.preventDefault();
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<i class="animate-spin h-5 w-5 mr-2" data-lucide="loader-2"></i> Mengirim...`;
+            lucide.createIcons();
+            
+            successMessage.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+
+            // Data yang akan dikirim ke Apps Script (menggunakan nama header Spreadsheet)
+            const dataToPost = {
+                // Kolom A (ID_DEAL)
+                'ID_DEAL': document.getElementById('nomorRFQ').value, 
+                // Kolom Lain
+                'Nama_Klien': document.getElementById('clientName').value,
+                'Nama_Sales': salesPersonInput.value,
+                'Type_Aktivitas': meetingTypeSelect.value,
+                'Nilai_Deal': document.getElementById('dealValue').value.replace(/\./g, ''), // Penting: angka murni
+                'Recurring': document.getElementById('isRecurring').checked,
+                'Hambatan': obstacleSection.classList.contains('hidden') ? "" : document.getElementById('salesObstacle').value,
+                'Tanggal_Meeting': document.getElementById('meetingDate').value,
+                'Lokasi_Kota': document.getElementById('lokasiKota').value,
+                'Lokasi_Provinsi': document.getElementById('lokasiProvinsi').value,
+                'Hasil_Meeting': document.getElementById('meetingNotes').value,
+                'Tipe_Klien': document.querySelector('input[name="clientType"]:checked').value,
+                'Capability': document.getElementById('capability').value,
+                'Unit_in_Charge': document.getElementById('unitInCharge').value,
+                'Kategori_Support': document.getElementById('supportCategory').value,
+                'Support_Status': (document.getElementById('unitInCharge').value === 'Tidak perlu support' ? 'N/A' : 'On Process'),
+                'Nama_Project': document.getElementById('namaProject').value,
+                'Client_Segment': clientSegmentSelect.value
+            };
+            
+            // Logika POST ke Apps Script
+            try {
+                 const result = await postDataToScript('create', { data: dataToPost });
+                 
+                 // Jika sukses, fetch ulang data untuk refresh dashboard
+                 allDeals = await fetchDataFromScript();
+                 renderFilteredDashboard(); 
+
+                 activityForm.reset();
+                 salesPersonInput.value = currentUser;
+                 populateSupportDropdowns(); 
+                 lokasiKotaSelect.innerHTML = '<option value="">-- Pilih Provinsi Dulu --</option>';
+                 document.getElementById('meetingDate').valueAsDate = new Date();
+                 recurringOption.classList.add('hidden');
+                 obstacleSection.classList.add('hidden');
+                 successMessage.textContent = 'Data berhasil disimpan ke Google Spreadsheet.';
+                 successMessage.classList.remove('hidden');
+                 setTimeout(() => successMessage.classList.add('hidden'), 3000);
+
+             } catch (error) {
+                 // Error sudah ditampilkan di postDataToScript
+                 errorMessage.textContent = 'Gagal menyimpan data. Cek console log.';
+                 errorMessage.classList.remove('hidden');
+             } finally { 
+                 submitBtn.disabled = false; 
+                 submitBtn.textContent = 'Simpan'; 
+                 lucide.createIcons();
+             }
+        });
+
+        // --- Listener Baru untuk Paginasi Support (Delegasi Event) ---
+        mainContent.addEventListener('click', (e) => {
+            const prevBtn = e.target.closest('#supportPrevBtn');
+            const nextBtn = e.target.closest('#supportNextBtn');
+
+            if (prevBtn && !prevBtn.disabled) {
+                supportCurrentPage--;
+                displayPaginatedSupportTable(); // Hanya render ulang tabel, bukan seluruh dashboard
+            } else if (nextBtn && !nextBtn.disabled) {
+                supportCurrentPage++;
+                displayPaginatedSupportTable(); // Hanya render ulang tabel, bukan seluruh dashboard
+            }
+        });
+
+
+        // Listener untuk tabel support (saat Sales mengubah status)
+        document.getElementById('supportTableBody').addEventListener('change', async (e) => {
+            if (e.target.classList.contains('support-status-select') && currentRole === 'sales') {
+                const selectEl = e.target;
+                const dealId = selectEl.dataset.id;
+                const newStatus = selectEl.value;
+
+                const dealIndex = allDeals.findIndex(d => d.id == dealId);
+                if (dealIndex === -1) return;
+                
+                const originalStatus = allDeals[dealIndex].supportStatus;
+                allDeals[dealIndex].supportStatus = newStatus; 
+                renderFilteredDashboard(); // Optimistic UI update
+
+                try {
+                    // Kirim update ke Apps Script
+                    await postDataToScript('update', { idToFind: dealId, data: { Support_Status: newStatus } });
+                    showCustomModal("Sukses", "Status Support berhasil diupdate di Spreadsheet.");
+
+                } catch (error) {
+                    // Rollback jika Gagal
+                    allDeals[dealIndex].supportStatus = originalStatus;
+                    renderFilteredDashboard();
+                    // Error sudah ditampilkan di postDataToScript
+                }
+            }
+        });
+    }
+    
+    // Mulai aplikasi
+    init();
+    lucide.createIcons();
+});
+</script>
+</body>
+</html>
+
+
+
+
+
